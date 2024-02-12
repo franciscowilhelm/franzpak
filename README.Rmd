@@ -1,0 +1,39 @@
+---
+output: github_document
+---
+
+<!-- README.md is generated from README.Rmd. Please edit that file -->
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  fig.path = "man/figures/README-",
+  out.width = "100%"
+)
+```
+
+# franzpak
+
+<!-- badges: start -->
+<!-- badges: end -->
+
+I created franzpak to collect some utility functions that I have written over the years.
+They stem from my routine use cases for R, which include:
+- clean/tidy/transform social science questionnaire data (e.g., `scoreItemsMulti()`)
+- analyze questionnaire data using quantitative methods 
+- including interfacing of R with Mplus thanks to the excellent MplusAutomation (e.g., `coef_wrapper()`)
+- including analysis of multilevel / diary data (e.g., `cortable_multilevel`).
+
+Therefore, users may find useful functions here for similar purposes.
+
+
+## Installation
+
+You can install the development version of franzpak like so:
+
+``` r
+# FILL THIS IN! HOW CAN PEOPLE INSTALL YOUR DEV PACKAGE?
+```
+
+Currently I do not plan to submit to CRAN, because of the added hassle and because my code is not compliant with CRAN standards (as I use tidyverse notation and quasi-quotation).
