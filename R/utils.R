@@ -1,11 +1,10 @@
 #' Assign significance signs following APA nomenclature
 #'
-#' @param x
+#' @param x numeric vector to be annotated using significance signs.
 #'
-#' @return
-#' @export
+#' @return character vector of significance signs
+# #' @export # do not export
 #'
-#' @examples
 #' @noRd
 star_assign <- function(x) {
   if(!is.na(x)) {

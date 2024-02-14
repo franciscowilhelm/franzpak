@@ -4,7 +4,7 @@
 \alias{scoreItemsMulti}
 \title{Automatically score multiple scales and return several psychometrical scale parameters}
 \usage{
-scoreItemsMulti(scalenames, dataframe, exclude = TRUE, manual_keys = NULL)
+scoreItemsMulti(scalenames, dataframe, exclude = TRUE, manual_keys = NULL, ...)
 }
 \arguments{
 \item{scalenames}{character vector of scale names}
@@ -13,12 +13,33 @@ scoreItemsMulti(scalenames, dataframe, exclude = TRUE, manual_keys = NULL)
 
 \item{exclude}{Boolean indicating whether to exclude participant responses where more than 1/3 of a scale are NA.}
 
-\item{manual_keys}{named list with manual keys, formatted like in scoreItems.}
+\item{manual_keys}{named list with manual keys, formatted like in \code{\link[psych:score.items]{psych::scoreItems()}}.}
+
+\item{...}{additional arguments to be passed to \code{\link[psych:score.items]{psych::scoreItems()}}.}
 }
 \value{
-a list object holding scale scores and other information
+a list object holding scale scores and other information.
 }
 \description{
-This is a convenience wrapper for psych::scoreItems that allows automatically
+This is a convenience wrapper for \code{\link[psych:score.items]{psych::scoreItems()}} that allows automatically
 scoring multiple scales at once.
+}
+\details{
+Note that, in line with the scoreItems function, scalenames is the first argument and data is the second argument.
+scoreItemsMulti always uses impute = "none" instead of the default impute="median" for \code{\link[psych:score.items]{psych::scoreItems()}}.
+}
+\examples{
+scalenames <- c("firstscale", "secondscale")
+scoreItemsMulti(scalenames, mc_items) # automatically detect reverse coded items
+# manually reverse items
+scoreItemsMulti(scalenames, mc_items,
+                manual_keys = list(
+                  secondscale = c(
+                    "secondscale_1",
+                    "secondscale_2",
+                    "secondscale_3",
+                    "secondscale_4",
+                    "-secondscale_5"
+                  )
+                ))
 }

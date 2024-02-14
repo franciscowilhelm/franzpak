@@ -3,11 +3,10 @@
 #' @param model mplus model as input.
 #'
 #' @return dataframe with coefficients and DV (dependent variable) and IV (independent variable) labels.
-#' @export
+# #' @export # do not export
 #'
-#' @examples
 #' @noRd
-sep_label <- function(model) {
+sep_label_mplus <- function(model) {
   # takes coef() as input
   modelcoefs <- coef(model)
   newlabels <- map_dfr(array_branch(modelcoefs |> select("Label"), 1), function(x) {
@@ -34,6 +33,10 @@ sep_label <- function(model) {
 #' @export
 #'
 #' @examples
+#' \dontrun{
+#' # get coefficients including confidence intervals
+#' coef_wrapper(mplusmodel, params = c('regression', 'new'), addci = TRUE)
+#' }
 coef_wrapper <- function(model, label_replace = NULL, params = c('regression'), bayes = FALSE, addci = FALSE) {
   # get coefs
   testcoefs <-
@@ -48,7 +51,7 @@ coef_wrapper <- function(model, label_replace = NULL, params = c('regression'), 
 
   }
   # add DV and IV and replace labels
-  testcoefs <- sep_label(testcoefs)
+  testcoefs <- sep_label_mplus(testcoefs)
   if(!is.null(label_replace)) {
     testcoefs <-
       testcoefs |> mutate(DV = str_replace_all(DV, label_replace),
@@ -60,14 +63,13 @@ coef_wrapper <- function(model, label_replace = NULL, params = c('regression'), 
   testcoefs
 }
 
-#' In beta/questioning status.
+#' In beta/questioning status. Useful only for indirect effects, but cannot coef_wrapper() be used directly?
 #'
 #' @param model
 #'
-#' @return
-#' @export
-#'
-#' @examples
+#' @return a tibble containing parameter and confidence intervals
+# #' @export # do not export
+#' @noRd
 confint_wrapper <- function(model) {
   message("Experimental function, may be deprecated in favor coef_wrapper()")
   coefs <- coef(model, params = 'new') |> select(Label, est)

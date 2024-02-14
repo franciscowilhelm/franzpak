@@ -29,3 +29,9 @@ a dataframe with mplus model coefficients
 \description{
 Format Mplus Model Coefficients
 }
+\examples{
+\dontrun{
+# get coefficients including confidence intervals
+coef_wrapper(mplusmodel, params = c('regression', 'new'), addci = TRUE)
+}
+}

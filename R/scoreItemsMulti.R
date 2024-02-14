@@ -1,13 +1,34 @@
-scoreItemsMulti <- function(scalenames, dataframe, exclude = TRUE, manual_keys = NULL) {
-  #' Automatically score multiple scales and return several psychometrical scale parameters
-  #'
-  #' This is a convenience wrapper for psych::scoreItems that allows automatically
-  #' scoring multiple scales at once.
-  #' @param scalenames character vector of scale names
-  #' @param dataframe dataframe holding the items to be scored
-  #' @param exclude Boolean indicating whether to exclude participant responses where more than 1/3 of a scale are NA.
-  #' @param manual_keys named list with manual keys, formatted like in scoreItems.
-  #' @return a list object holding scale scores and other information
+#' Automatically score multiple scales and return several psychometrical scale parameters
+#'
+#' This is a convenience wrapper for [psych::scoreItems()] that allows automatically
+#' scoring multiple scales at once.
+#' @param scalenames character vector of scale names
+#' @param dataframe dataframe holding the items to be scored
+#' @param exclude Boolean indicating whether to exclude participant responses where more than 1/3 of a scale are NA.
+#' @param manual_keys named list with manual keys, formatted like in [psych::scoreItems()].
+#' @param ... additional arguments to be passed to [psych::scoreItems()].
+#' @return a list object holding scale scores and other information.
+#' @export
+#' @details
+#' Note that, in line with the scoreItems function, scalenames is the first argument and data is the second argument.
+#' scoreItemsMulti always uses impute = "none" instead of the default impute="median" for [psych::scoreItems()].
+#' @examples
+#' scalenames <- c("firstscale", "secondscale")
+#' scoreItemsMulti(scalenames, mc_items) # automatically detect reverse coded items
+#' # manually reverse items
+#' scoreItemsMulti(scalenames, mc_items,
+#'                 manual_keys = list(
+#'                   secondscale = c(
+#'                     "secondscale_1",
+#'                     "secondscale_2",
+#'                     "secondscale_3",
+#'                     "secondscale_4",
+#'                     "-secondscale_5"
+#'                   )
+#'                 ))
+
+scoreItemsMulti <- function(scalenames, dataframe, exclude = TRUE, manual_keys = NULL, ...) {
+
 
 
   purrr::walk(scalenames,
@@ -80,22 +101,19 @@ scoreItemsMulti <- function(scalenames, dataframe, exclude = TRUE, manual_keys =
   }
 
 
-
-
-  if (exclude == TRUE) {
     list_scored <-
       purrr::map(scalenames, function(name) {
         keys <- keys_negative[[name]]
-        subdf <- dataframe_exclude |> select(starts_with(name))
-        out <- psych::scoreItems(keys = keys, subdf, impute = "none")
+        if (exclude == TRUE) {
+          subdf <- dataframe_exclude |> select(starts_with(name))
+        } else { subdf <- dataframe_items |> select(starts_with(name)) }
+        out <- psych::scoreItems(keys = keys, subdf, impute = "none", ...)
         out$scores[] <-
           apply(out$scores, 2, function(a) {
             ifelse(is.nan(a), NA_real_, a)
           })
         return(out)
       })
-  }
-
 
   names(list_scored) <- scalenames
   scores <- purrr::map2_dfc(list_scored, scalenames, function(scale, name) {

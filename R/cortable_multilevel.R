@@ -1,14 +1,16 @@
 #' Correlation table for two-level data
 #'
-#' @param df the dataframe used
-#' @param varnames the variable names as string vector
-#' @param grp the variable name that identifies the level-2 group as string character
+#' @param df the dataframe to be used, should contain all variables including grouping variable.
+#' @param varnames the variable names as character vector.
+#' @param grp the variable name that identifies the level-2 group as character.
+#' @param varlabels character vector giving labels of the variables.
 #'
-#' @return a correlation table as tibble
+#' @return a correlation table as tibble.
 #' @export
 #'
 #' @examples
-cortable_multilevel <- function(df, varnames, grp) {
+#' cortable_multilevel(mc_twolevel, c("Y", "M", "X"), "CLUSTER")
+cortable_multilevel <- function(df, varnames, grp, varlabels = NULL) {
   statsby_summary <- psych::statsBy(df |> select( all_of(grp), all_of(varnames)), group = grp)
 
   icc <- statsby_summary$ICC1 |>
@@ -46,10 +48,16 @@ cortable_multilevel <- function(df, varnames, grp) {
   cortable <- cortable |>   as_tibble(rownames = "var") # als data frame formatieren (später wichtig)
 
   cortable_integriert <- tibble(cortable["var"],
-                                m = t(mittelwerte), # t() transponiert die Dimensionen der Variable, damit wir es als spalte (3x1) haben statt als zeile (1x3)
-                                sd = t(standardabweichung),
-                                icc = icc[2:length(icc)], # 1 überspringen da wir den ICC von "id" nicht brauchen
+                                M = as.vector(t(mittelwerte[1,])), # t() transponiert die Dimensionen der Variable, damit wir es als spalte (3x1) haben statt als zeile (1x3)
+                                SD = as.vector(t(standardabweichung[1,])),
+                                ICC = icc[2:length(icc)], # 1 überspringen da wir den ICC von "id" nicht brauchen
                                 cortable[,2:ncol(cortable)])
 
+  if(!is.null(varlabels)) {
+    cortable_integriert$var <- str_c(1:length(varnames), ".", varlabels)
+  } else {
+    cortable_integriert$var <- str_c(1:length(varnames), ".", varnames)
+  }
+  names(cortable_integriert) <- c("Variable", "M", "SD", "ICC", str_c(1:length(varnames), "."))
   cortable_integriert
 }

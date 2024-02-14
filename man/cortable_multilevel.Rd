@@ -4,18 +4,23 @@
 \alias{cortable_multilevel}
 \title{Correlation table for two-level data}
 \usage{
-cortable_multilevel(df, varnames, grp)
+cortable_multilevel(df, varnames, grp, varlabels = NULL)
 }
 \arguments{
-\item{df}{the dataframe used}
+\item{df}{the dataframe to be used, should contain all variables including grouping variable.}
 
-\item{varnames}{the variable names as string vector}
+\item{varnames}{the variable names as character vector.}
 
-\item{grp}{the variable name that identifies the level-2 group as string character}
+\item{grp}{the variable name that identifies the level-2 group as character.}
+
+\item{varlabels}{character vector giving labels of the variables.}
 }
 \value{
-a correlation table as tibble
+a correlation table as tibble.
 }
 \description{
 Correlation table for two-level data
+}
+\examples{
+cortable_multilevel(mc_twolevel, c("Y", "M", "X"), "CLUSTER")
 }
