@@ -38,6 +38,7 @@ sep_label_mplus <- function(model) {
 #' coef_wrapper(mplusmodel, params = c('regression', 'new'), addci = TRUE)
 #' }
 coef_wrapper <- function(model, label_replace = NULL, params = c('regression'), bayes = FALSE, addci = FALSE) {
+  # todo: check if model is of class mplus
   # get coefs
   testcoefs <-
     coef(model, params = params)

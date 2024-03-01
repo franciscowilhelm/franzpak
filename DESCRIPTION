@@ -16,9 +16,11 @@ Imports:
     dplyr,
     psych,
     purrr,
+    rlang,
     stats,
     stringr,
     tibble,
+    tidyr,
     tidyselect
 Depends: 
     R (>= 2.10)
