@@ -41,6 +41,19 @@ scoreItemsMulti <- function(scalenames, dataframe, exclude = TRUE, manual_keys =
          }
        } )
 
+  if(!is.null(manual_keys)) {
+    if (length(intersect(scalenames, names(manual_keys))) != length(names(manual_keys))) {
+      stop(
+        c(
+          "For one or more manual_keys no matching scalename could be found. Possibly there is a typo in the manual_keys or scalenames.
+           Following scales in the manual_keys have no equivalent in the scalenames: ",
+          names(manual_keys)[!(names(manual_keys) %in% scalenames)]
+        )
+      )
+    }
+  }
+
+
   # select items from dataframe
   dataframe_items <-  dplyr::select(dataframe, starts_with(scalenames))
 
@@ -105,8 +118,8 @@ scoreItemsMulti <- function(scalenames, dataframe, exclude = TRUE, manual_keys =
       purrr::map(scalenames, function(name) {
         keys <- keys_negative[[name]]
         if (exclude == TRUE) {
-          subdf <- dataframe_exclude |> select(starts_with(name))
-        } else { subdf <- dataframe_items |> select(starts_with(name)) }
+          subdf <- dataframe_exclude |> dplyr::select(starts_with(name))
+        } else { subdf <- dataframe_items |> dplyr::select(starts_with(name)) }
         out <- psych::scoreItems(keys = keys, subdf, impute = "none", ...)
         out$scores[] <-
           apply(out$scores, 2, function(a) {
