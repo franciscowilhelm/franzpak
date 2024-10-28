@@ -14,27 +14,27 @@ cortable_multilevel <- function(df, varnames, grp, varlabels = NULL) {
   statsby_summary <- psych::statsBy(df |> select( all_of(grp), all_of(varnames)), group = grp)
 
   icc <- statsby_summary$ICC1 |>
-    round(2) # runden
+    papaja::print_num() # runden
   icc
 
 
   mittelwerte <- df |> summarise(across(all_of(varnames),
                                                        ~mean(.x, na.rm = TRUE),
                                                        .names = "m_{.col}")) |>
-    round(2) # runden
+    papaja::print_num() # runden
 
   mittelwerte
 
   standardabweichung <- df |>  summarise(across(all_of(varnames),
                                                                ~sd(.x, na.rm = TRUE),
                                                                .names = "sd_{.col}")) |>
-    round(2) # runden
+    papaja::print_num() # runden
 
   standardabweichung
 
 
-  cortable_between <- statsby_summary$rbg |> round(2) # Zwischen Person Kor.
-  cortable_within <- statsby_summary$rwg |> round(2) # Inner Person Kor.
+  cortable_between <- statsby_summary$rbg |> papaja::apa_num() # Zwischen Person Kor.
+  cortable_within <- statsby_summary$rwg |> papaja::apa_num() # Inner Person Kor.
   for(i in 1:length(cortable_between)) {
     cortable_between[i] <- str_c(cortable_between[i], vstar_assign(statsby_summary$pbg[i]))
   }
@@ -45,6 +45,7 @@ cortable_multilevel <- function(df, varnames, grp, varlabels = NULL) {
 
   cortable <- cortable_between
   cortable[lower.tri(cortable)] <- cortable_within[lower.tri(cortable_within)] # Inner-Person Korrelationen im unteren Dreieck einfügen.
+  diag(cortable) <- "-"
   cortable <- cortable |>   as_tibble(rownames = "var") # als data frame formatieren (später wichtig)
 
   cortable_integriert <- tibble(cortable["var"],
