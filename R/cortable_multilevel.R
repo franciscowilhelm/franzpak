@@ -4,18 +4,25 @@
 #' @param varnames the variable names as character vector.
 #' @param grp the variable name that identifies the level-2 group as character.
 #' @param varlabels character vector giving labels of the variables.
+#' @param wpv Use Within-Person Variance (WPV) instead of ICC. WPV = 1-ICC.
 #'
 #' @return a correlation table as tibble.
 #' @export
 #'
 #' @examples
 #' cortable_multilevel(mc_twolevel, c("Y", "M", "X"), "CLUSTER")
-cortable_multilevel <- function(df, varnames, grp, varlabels = NULL) {
+cortable_multilevel <- function(df, varnames, grp, varlabels = NULL, wpv = FALSE) {
   statsby_summary <- psych::statsBy(df |> select( all_of(grp), all_of(varnames)), group = grp)
 
-  icc <- statsby_summary$ICC1 |>
-    papaja::print_num() # runden
-  icc
+
+  if(wpv == FALSE) {
+    icc <- statsby_summary$ICC1 |>
+      papaja::print_num() # runden
+  } else {
+    icc <- statsby_summary$ICC1 |>
+      (\(.x) 1 - .x)() |>
+      papaja::print_num() # runden
+  }
 
 
   mittelwerte <- df |> summarise(across(all_of(varnames),
@@ -59,6 +66,10 @@ cortable_multilevel <- function(df, varnames, grp, varlabels = NULL) {
   } else {
     cortable_integriert$var <- str_c(1:length(varnames), ".", varnames)
   }
-  names(cortable_integriert) <- c("Variable", "M", "SD", "ICC", str_c(1:length(varnames), "."))
+  if(wpv == FALSE ) {
+    names(cortable_integriert) <- c("Variable", "M", "SD", "ICC", str_c(1:length(varnames), "."))
+  } else {
+    names(cortable_integriert) <- c("Variable", "M", "SD", "WPV", str_c(1:length(varnames), "."))
+    }
   cortable_integriert
 }
