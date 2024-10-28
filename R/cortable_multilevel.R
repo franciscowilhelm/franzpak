@@ -5,23 +5,25 @@
 #' @param grp the variable name that identifies the level-2 group as character.
 #' @param varlabels character vector giving labels of the variables.
 #' @param wpv Use Within-Person Variance (WPV) instead of ICC. WPV = 1-ICC.
+#' @param use.001 Don't use *** to mark p < .001; this makes the table more concise.
+
 #'
 #' @return a correlation table as tibble.
 #' @export
 #'
 #' @examples
 #' cortable_multilevel(mc_twolevel, c("Y", "M", "X"), "CLUSTER")
-cortable_multilevel <- function(df, varnames, grp, varlabels = NULL, wpv = FALSE) {
+cortable_multilevel <- function(df, varnames, grp, varlabels = NULL, wpv = FALSE, use.001 = TRUE) {
   statsby_summary <- psych::statsBy(df |> select( all_of(grp), all_of(varnames)), group = grp)
 
 
   if(wpv == FALSE) {
     icc <- statsby_summary$ICC1 |>
-      papaja::print_num() # runden
+      papaja::print_num(gt1 = FALSE) # runden
   } else {
     icc <- statsby_summary$ICC1 |>
       (\(.x) 1 - .x)() |>
-      papaja::print_num() # runden
+      papaja::print_num(gt1 = FALSE) # runden
   }
 
 
@@ -40,14 +42,14 @@ cortable_multilevel <- function(df, varnames, grp, varlabels = NULL, wpv = FALSE
   standardabweichung
 
 
-  cortable_between <- statsby_summary$rbg |> papaja::apa_num() # Zwischen Person Kor.
-  cortable_within <- statsby_summary$rwg |> papaja::apa_num() # Inner Person Kor.
+  cortable_between <- statsby_summary$rbg |> papaja::apa_num(gt1 = FALSE) # Zwischen Person Kor.
+  cortable_within <- statsby_summary$rwg |> papaja::apa_num(gt1 = FALSE) # Inner Person Kor.
   for(i in 1:length(cortable_between)) {
-    cortable_between[i] <- str_c(cortable_between[i], vstar_assign(statsby_summary$pbg[i]))
+    cortable_between[i] <- str_c(cortable_between[i], vstar_assign(statsby_summary$pbg[i], use.001))
   }
 
   for(i in 1:length(cortable_within)) {
-    cortable_within[i] <- str_c(cortable_within[i], vstar_assign(statsby_summary$pwg[i]))
+    cortable_within[i] <- str_c(cortable_within[i], vstar_assign(statsby_summary$pwg[i], use.001))
   }
 
   cortable <- cortable_between
