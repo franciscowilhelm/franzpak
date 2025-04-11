@@ -4,7 +4,14 @@
 \alias{cortable_multilevel}
 \title{Correlation table for two-level data}
 \usage{
-cortable_multilevel(df, varnames, grp, varlabels = NULL)
+cortable_multilevel(
+  df,
+  varnames,
+  grp,
+  varlabels = NULL,
+  wpv = FALSE,
+  use.001 = TRUE
+)
 }
 \arguments{
 \item{df}{the dataframe to be used, should contain all variables including grouping variable.}
@@ -14,6 +21,10 @@ cortable_multilevel(df, varnames, grp, varlabels = NULL)
 \item{grp}{the variable name that identifies the level-2 group as character.}
 
 \item{varlabels}{character vector giving labels of the variables.}
+
+\item{wpv}{Use Within-Person Variance (WPV) instead of ICC. WPV = 1-ICC.}
+
+\item{use.001}{Don't use *** to mark p < .001; this makes the table more concise.}
 }
 \value{
 a correlation table as tibble.
