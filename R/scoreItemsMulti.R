@@ -91,18 +91,26 @@ scoreItemsMulti <- function(scalenames, dataframe, exclude = TRUE, manual_keys =
     })
   names(negative_index) <- scalenames_autoonly
 
+  # Identify scales with negatively correlated items
+  scales_with_negatives <- names(negative_index)[purrr::map_lgl(negative_index, any)]
 
-  if (any(purrr::map_lgl(negative_index, any))) {
+  if (length(scales_with_negatives) > 0) {
     message(
-      "Some items were negatively correlated with total scale and were (automatically) reversed. \n Please Check $negative_index"
+      paste0(
+        "Some items were negatively correlated with total scale(s) and were (automatically) reversed. \n",
+        "Scales with reversed items: ", paste(scales_with_negatives, collapse = ", "), "\n",
+        "Please Check $negative_index for details."
+      )
     )
   }
+
 
   keys_negative <-
     purrr::map2(keys.list, negative_index, function(x, y) {
       x[y] <- stringr::str_c("-", x[y], sep = "")
       return(x)
     })
+
 
   # manual keys
   if (!is.null(manual_keys)) {
