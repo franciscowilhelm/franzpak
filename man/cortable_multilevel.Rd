@@ -10,7 +10,8 @@ cortable_multilevel(
   grp,
   varlabels = NULL,
   wpv = FALSE,
-  use.001 = TRUE
+  use.001 = TRUE,
+  return_list = FALSE
 )
 }
 \arguments{
@@ -25,13 +26,29 @@ cortable_multilevel(
 \item{wpv}{Use Within-Person Variance (WPV) instead of ICC. WPV = 1-ICC.}
 
 \item{use.001}{Don't use *** to mark p < .001; this makes the table more concise.}
+
+\item{return_list}{Logical. If TRUE, returns a list with both formatted and numeric tables.
+If FALSE, returns only the formatted table (default behavior for backward compatibility).}
 }
 \value{
-a correlation table as tibble.
+If return_list = FALSE: a formatted correlation table as tibble.
+If return_list = TRUE: a list containing:
+\itemize{
+\item formatted_table: The formatted correlation table with APA-style formatting
+\item numeric_table: The correlation table with numeric values retained
+\item numeric_table_p_values: The correlation table with p-values for significance testing
+}
 }
 \description{
 Correlation table for two-level data
 }
 \examples{
+# Return formatted table only (backward compatible)
 cortable_multilevel(mc_twolevel, c("Y", "M", "X"), "CLUSTER")
+
+# Return both formatted and numeric tables
+result <- cortable_multilevel(mc_twolevel, c("Y", "M", "X"), "CLUSTER", return_list = TRUE)
+result$formatted_table        # APA-formatted table
+result$numeric_table          # Numeric table for further analysis
+result$numeric_table_p_values # P-values for significance testing
 }

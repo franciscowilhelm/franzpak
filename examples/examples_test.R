@@ -16,7 +16,7 @@ scoreItemsMulti(scalenames, mc_items,
 
 # cortable_multilevel
 cortable_multilevel(mc_twolevel, c("Y", "M", "X"), "CLUSTER")
-
+cortable_multilevel(mc_twolevel, c("Y", "M", "X"), "CLUSTER", return_list = TRUE)
 
 # mplus coef tools
 coef_wrapper(mplusmodel, params = c('regression', 'new'), addci = TRUE)
