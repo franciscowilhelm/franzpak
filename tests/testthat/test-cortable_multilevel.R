@@ -120,3 +120,56 @@ test_that("p-values table contains expected values", {
   expect_true(all(is.na(result$numeric_table_p_values$SD)))
   expect_true(all(is.na(result$numeric_table_p_values$ICC)))
 })
+
+
+# Test functionality for level-2-only variables
+test_that("Level-2 variables are auto-detected and handled", {
+  set.seed(42)
+  mc_twolevel_l2var <- mc_twolevel |>
+    dplyr::group_by(CLUSTER) |>
+    dplyr::mutate(WL2 = rnorm(1)) |>
+    dplyr::ungroup()
+
+  expect_message(
+    result <- cortable_multilevel(mc_twolevel_l2var, c("Y", "M", "X", "WL2"), "CLUSTER", return_list = TRUE),
+    "Level-2 variable"
+  )
+
+  formatted <- result$formatted_table
+  numeric <- result$numeric_table
+  p_values <- result$numeric_table_p_values
+
+  expect_equal(formatted$Variable, c("1.Y", "2.M", "3.X", "4.WL2"))
+  expect_equal(numeric$Variable, formatted$Variable)
+  expect_equal(p_values$Variable, formatted$Variable)
+
+  expect_equal(formatted$ICC[4], "-")
+  expect_true(is.na(numeric$ICC[4]))
+
+  expect_equal(unlist(formatted[4, c("1.", "2.", "3.")], use.names = FALSE),
+               rep("-", 3))
+  expect_true(all(is.na(unlist(numeric[4, c("1.", "2.", "3.")], use.names = FALSE))))
+  expect_true(all(is.na(unlist(p_values[4, c("1.", "2.", "3.")], use.names = FALSE))))
+
+  expect_true(all(!is.na(numeric$`4.`[1:3])))
+})
+
+test_that("User-specified between variables suppress auto-detect message", {
+  set.seed(42)
+  mc_twolevel_l2var <- mc_twolevel |>
+    dplyr::group_by(CLUSTER) |>
+    dplyr::mutate(WL2 = rnorm(1)) |>
+    dplyr::ungroup()
+
+  expect_silent(
+    result <- cortable_multilevel(mc_twolevel_l2var,
+                                  c("Y", "M", "X", "WL2"),
+                                  "CLUSTER",
+                                  between = "WL2",
+                                  return_list = TRUE)
+  )
+
+  formatted <- result$formatted_table
+  expect_equal(formatted$Variable[4], "4.WL2")
+  expect_equal(formatted$ICC[4], "-")
+})
