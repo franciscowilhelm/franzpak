@@ -1,0 +1,919 @@
+---
+title: "Running Background Jobs with franzpak"
+format: html
+---
+
+# Introduction
+
+**⚠️ Warning:** This vignette and its functions are still under construction and can be considered experimental.
+
+
+This vignette demonstrates how to use the background job management functions (`bgjm_*`) with practical examples using `lavaan` and `tidyLPA`.
+
+The `franzpak` package provides a set of functions for running long-running statistical models in background R sessions (using the `callr` package to make this possible). This is particularly useful for:
+
+- Running multiple models in parallel
+- Freeing up your interactive R session while models run
+- Isolating model execution to prevent crashes from affecting your main session
+- Keeping logs and artifacts organized in dedicated directories
+
+The functions were created with compute-intense lavaan (e.g., bootstrapped standard errors in SEM) and mixture models (e.g., latent profile analyses) in mind.
+
+# Getting Started
+
+The background job system requires the `callr` package, which is installed as a dependency of `franzpak`. Optional packages:
+
+- `lavaan` - for structural equation modeling
+- `tidyLPA` (>= 1.0.0) - for latent profile analysis
+- `mclust` - for tidyLPA's mclust backend
+- `MplusAutomation` - for tidyLPA's Mplus backend
+
+```{r}
+library(franzpak)
+library(lavaan)
+
+# helper for use in running notebooks
+wait_for_job <- function(job_id, max_iterations = 100) {
+  for (i in seq_len(max_iterations)) {
+    status <- bgjm_status(job_id)
+    if (status != "running") {
+      return(status)
+    }
+    bgjm_poll(timeout_ms = 500)
+  }
+  return("timeout")
+}
+```
+
+Let's walk through a complete workflow using the `lavaan` package with a CFA model:
+
+```{r}
+
+# Define a simple CFA model
+model_syntax <- "
+  visual  =~ x1 + x2 + x3
+  textual =~ x4 + x5 + x6
+  speed   =~ x7 + x8 + x9
+"
+
+# Load the dataset
+data(HolzingerSwineford1939)
+
+# Launch the job in the background
+job_id <- bgjm_start_lavaan(
+  model_syntax = model_syntax,
+  data = HolzingerSwineford1939,
+  lavaan_fun = "cfa",
+  job_name = "holzinger-cfa"
+)
+```
+
+When you call `bgjm_start_lavaan()`, the function:
+
+1. Creates an isolated R session using `callr::r_bg()`
+2. Sets up a dedicated directory for this job (by default in `tempdir()`)
+3. Passes your model syntax and data to the background session
+4. Starts running `lavaan::cfa()` in that isolated session
+5. Returns immediately with a job ID, **without waiting** for the model to finish
+
+This means your interactive R session is free to continue working while the CFA runs in the background.
+
+```{r}
+print(job_id)
+# [1] "holzinger-cfa"
+
+# Check status
+status <- bgjm_status(job_id)
+print(status)
+# [1] "running"
+
+# Wait for completion
+wait_for_job(job_id)
+
+# Collect results
+collected <- bgjm_collect(job_id)
+fit <- collected$result
+
+# View results
+# summary(fit, fit.measures = TRUE)
+lavaan::fitMeasures(fit, c("cfi", "rmsea"))
+
+# Clean up when done
+bgjm_remove(job_id, delete_dir = TRUE)
+```
+
+Let's break down what happened in each step:
+
+- **Monitoring**: `bgjm_status()` checks whether the background job is `"running"`, `"finished"`, or `"error"`
+- **Polling**: `bgjm_poll()` processes any pending events from background jobs (necessary for status updates)
+- **Waiting** (only for linear execution): The `wait_for_job()` helper keeps checking until the job completes. You only need this when rendering .qmd/.Rmd documents or running scripts that execute top-to-bottom. In interactive R sessions, you typically start the job, do other work, and come back later to check the status.
+- **Collecting**: `bgjm_collect()` retrieves the fitted lavaan object from the background session
+- **Cleanup**: `bgjm_remove()` unregisters the job and optionally deletes its working directory
+
+The `collected` object contains:
+- `$result`: The actual lavaan model object
+- `$job_dir`: Path to the job's working directory
+- `$artifacts_dir`: Path where any files created during execution are stored
+- `$stdout`/`$stderr`: Paths to log files
+
+## Example 2 - SEM Mediation with Bootstrapped Standard Errors
+
+Bootstrap procedures are perfect for background jobs due to their high computational load:
+
+```{r}
+#| eval: false
+
+# Mediation model
+mediation_model <- "
+  # Direct effects
+  M ~ a * X
+  Y ~ b * M + c * X
+
+  # Indirect effect (mediation)
+  indirect := a * b
+  total := c + (a * b)
+"
+
+# Simulate some data
+set.seed(123)
+n <- 200
+X <- rnorm(n)
+M <- 0.5 * X + rnorm(n)
+Y <- 0.3 * M + 0.2 * X + rnorm(n)
+mediation_data <- data.frame(X, M, Y)
+
+# Run in background with bootstrap (takes time!)
+job_id <- bgjm_start_lavaan(
+  model_syntax = mediation_model,
+  data = mediation_data,
+  lavaan_fun = "sem",
+  job_name = "mediation",
+  se = "bootstrap",
+  bootstrap = 1000
+)
+
+# Continue working in your interactive session...
+print("Job running in background, you can keep working!")
+
+# When ready, collect results
+wait_for_job(job_id)
+result <- bgjm_collect(job_id)
+fit <- result$result
+
+# View mediation results with bootstrap CIs
+lavaan::parameterEstimates(fit, boot.ci.type = "bca.simple")
+
+# Clean up
+bgjm_remove(job_id, delete_dir = TRUE)
+```
+
+
+## Example 3 - Latent Profile Analysis with tidyLPA()
+
+
+```{r}
+#| eval: false
+library(tidyLPA)
+
+# Prepare data (iris dataset)
+iris_numeric <- iris[, 1:4]
+
+# Estimate profiles using mclust
+job_id <- bgjm_start_tidylpa(
+  data = iris_numeric,
+  n_profiles = 3,
+  models = 1,
+  package = "mclust",
+  job_name = "iris-lpa"
+)
+
+wait_for_job(job_id)
+result <- bgjm_collect(job_id)
+
+# Access tidyLPA results
+lpa_result <- result$result
+print(lpa_result)
+
+# Clean up
+bgjm_remove(job_id, delete_dir = TRUE)
+```
+
+# Advanced usage
+
+## Monitoring Job Status
+
+### List All Jobs
+
+View all registered background jobs:
+
+```{r}
+#| eval: false
+job_list <- bgjm_list()
+print(job_list)
+```
+
+The output shows:
+- `id`: Job identifier
+- `name`: Friendly name you provided
+- `status`: Current status (`"running"`, `"finished"`, or `"error"`)
+- `started`: When the job was launched
+- `dir`: Working directory for the job
+- `stdout`/`stderr`: Log file paths
+
+### Helper Function for Waiting
+
+Create a reusable helper:
+
+```{r}
+#| eval: false
+wait_for_job <- function(job_id, max_iterations = 100) {
+  for (i in seq_len(max_iterations)) {
+    status <- bgjm_status(job_id)
+    if (status != "running") {
+      return(status)
+    }
+    bgjm_poll(timeout_ms = 500)
+  }
+  return("timeout")
+}
+
+# Use it
+final_status <- wait_for_job(job_id)
+print(final_status)
+```
+
+## Reading Logs
+
+View captured output:
+
+```{r}
+#| eval: false
+# Standard output
+stdout_lines <- bgjm_read_stdout(job_id)
+cat(stdout_lines, sep = "\n")
+
+# Standard error (warnings, messages)
+stderr_lines <- bgjm_read_stderr(job_id)
+cat(stderr_lines, sep = "\n")
+```
+
+
+## Return Strategies
+
+### Inline vs. RDS
+
+By default, results are returned through inter-process communication:
+
+```{r}
+#| eval: false
+# Default: inline return (results via IPC)
+job_id <- bgjm_start_lavaan(
+  model_syntax, HolzingerSwineford1939,
+  lavaan_fun = "cfa",
+  return_strategy = "inline"  # default
+)
+
+# Use inline strategy and clean up immediately
+wait_for_job(job_id)
+result <- bgjm_collect(job_id, auto_remove = TRUE)
+```
+
+For very large models, use RDS serialization:
+
+```{r}
+#| eval: false
+# Results saved to .rds file
+job_id <- bgjm_start_lavaan(
+  model_syntax, HolzingerSwineford1939,
+  lavaan_fun = "cfa",
+  return_strategy = "rds"
+)
+
+wait_for_job(job_id)
+collected <- bgjm_collect(job_id, read_rds = TRUE)
+fit <- collected$result
+
+# RDS file path available if needed
+print(collected$result_rds)
+
+# Clean up
+bgjm_remove(job_id, delete_dir = TRUE)
+```
+
+### Data Passing Strategies
+
+Pass data as an object (default) or serialize to RDS:
+
+```{r}
+#| eval: false
+# Default: pass data as object
+job_id <- bgjm_start_lavaan(
+  model_syntax, HolzingerSwineford1939,
+  pass_data_as = "object"  # default
+)
+
+# Or serialize data to RDS first (useful for very large datasets)
+job_id <- bgjm_start_lavaan(
+  model_syntax, HolzingerSwineford1939,
+  pass_data_as = "rds"
+)
+```
+
+
+## Working with File Outputs from Jobs
+
+Some statistical packages (like Mplus) create output files during estimation. The background job system automatically tracks and organizes these files for you.
+
+### Understanding the Artifacts Directory
+
+When a background job runs, it creates this directory structure:
+
+```
+job_directory/
+├── tmp/              # Temporary working directory for the job
+├── artifacts/        # Files created during job execution
+├── stdout.log        # Standard output
+└── stderr.log        # Standard error/warnings
+```
+
+The **artifacts directory** is special: any files that appear in the job's working directory during execution are automatically moved here when the job completes. This includes:
+
+- Mplus output files (.out, .inp, .dat)
+- Plots or figures saved by your code
+- Any other files written during the job
+
+### Example: Latent Profile Analysis with Mplus
+
+Let's run a tidyLPA analysis with Mplus with keepfiles = TRUE argument, which creates `.inp` and `.out` files:
+
+```{r}
+#| eval: false
+
+# Prepare data - Mplus requires alphanumeric variable names (no dots)
+iris_numeric <- iris[, 1:4]
+iris_mplus <- iris_numeric
+names(iris_mplus) <- c("Sepal_Length", "Sepal_Width",
+                        "Petal_Length", "Petal_Width")
+
+# Run LPA with Mplus backend
+job_id <- bgjm_start_tidylpa(
+  data = iris_mplus,
+  n_profiles = 3,
+  models = 1,
+  package = "Mplus",
+  keepfiles = TRUE,  # Important: tells tidyLPA to keep Mplus files
+  job_name = "iris-lpa-mplus"
+)
+
+wait_for_job(job_id, max_iterations = 200)
+result <- bgjm_collect(job_id)
+
+# Examine what was created
+print(result$job_dir)
+# e.g., "/var/folders/.../iris-lpa-mplus"
+
+print(result$artifacts_dir)
+# e.g., "/var/folders/.../iris-lpa-mplus/artifacts"
+
+# List the Mplus files that were created
+list.files(result$artifacts_dir)
+# [1] "iris_mplus.inp"  "iris_mplus.out"
+
+# You can read the Mplus output file directly
+mplus_output <- readLines(file.path(result$artifacts_dir, "iris_mplus.out"))
+head(mplus_output, 20)
+```
+
+By default, this is stored in R's temporary directory (`tempdir()`).
+
+**⚠️ Warning:** Temporary directories are usually deleted when R exits, but:
+
+- May persist after crashes or force-quits
+- System cleanup eventually removes old temp files
+- **Results can be lost if not collected before R exits**
+
+Don't clean up yet if you want to keep the files - see next section!
+
+### Using Persistent Storage
+
+To keep your output files permanently, specify a custom `output_base`:
+
+```{r}
+#| eval: false
+
+# Create a permanent directory for LPA analyses
+lpa_results <- file.path(getwd(), "lpa_results")
+dir.create(lpa_results, showWarnings = FALSE, recursive = TRUE)
+
+# Run the same Mplus job, but with persistent storage
+job_id <- bgjm_start_tidylpa(
+  data = iris_mplus,
+  n_profiles = 3,
+  models = 1,
+  package = "Mplus",
+  keepfiles = TRUE,
+  job_name = "iris-lpa-mplus",
+  output_base = lpa_results  # Files will persist here!
+)
+
+wait_for_job(job_id, max_iterations = 200)
+result <- bgjm_collect(job_id)
+
+# Job directory is now in your working directory
+print(result$job_dir)
+# "./lpa_results/iris-lpa-mplus"
+
+print(result$artifacts_dir)
+# "./lpa_results/iris-lpa-mplus/artifacts"
+
+# Files are permanently saved
+list.files(result$artifacts_dir)
+# [1] "iris_mplus.inp"  "iris_mplus.out"
+
+# Remove from job registry but KEEP the files on disk
+bgjm_remove(job_id, delete_dir = FALSE)
+
+# The directory and all Mplus files remain accessible
+# You can come back to them later, even after restarting R
+```
+
+This is the recommended approach when working with Mplus or any analysis that produces files you want to keep.
+
+## Job Naming
+
+When you provide a `job_name`, that exact name is used as the job ID (if it's unique):
+
+```{r}
+# First job with this name
+job1 <- bgjm_start_lavaan(model_syntax, data, "cfa", job_name = "my-model")
+print(job1)
+# [1] "my-model"
+
+# Second job with same name - automatically gets -1 suffix
+job2 <- bgjm_start_lavaan(model_syntax, data, "cfa", job_name = "my-model")
+print(job2)
+# [1] "my-model-1"
+
+# Third job with same name - gets -2 suffix
+job3 <- bgjm_start_lavaan(model_syntax, data, "cfa", job_name = "my-model")
+print(job3)
+# [1] "my-model-2"
+
+# Clean up
+lapply(c(job1, job2, job3), bgjm_kill)
+lapply(c(job1, job2, job3), bgjm_remove, delete_dir = TRUE)
+```
+
+If you don't provide a `job_name`, a descriptive default is generated based on the function type:
+
+```{r}
+#| eval: false
+# lavaan functions use "lavaan-{fun}"
+job_id <- bgjm_start_lavaan(model_syntax, data, "cfa")
+print(job_id)
+# [1] "lavaan-cfa"
+
+# tidyLPA uses "tidylpa-n{profiles}-{package}"
+job_id2 <- bgjm_start_tidylpa(iris_numeric, n_profiles = 3, package = "mclust")
+print(job_id2)
+# [1] "tidylpa-n3-mclust"
+
+# If you run another with same defaults, it gets numbered
+job_id3 <- bgjm_start_lavaan(model_syntax, data, "cfa")
+print(job_id3)
+# [1] "lavaan-cfa-1"
+
+# Clean up
+bgjm_kill(job_id)
+bgjm_remove(job_id, delete_dir = TRUE)
+bgjm_kill(job_id2)
+bgjm_remove(job_id2, delete_dir = TRUE)
+bgjm_kill(job_id3)
+bgjm_remove(job_id3, delete_dir = TRUE)
+```
+
+This makes it easy to reference your jobs - you can provide explicit names when needed, or use the sensible defaults.
+
+## Advanced lavaan Example: Multiple Models in Parallel
+
+Run several competing models simultaneously:
+
+```{r}
+#| eval: false
+
+model_1factor <- "
+  general =~ x1 + x2 + x3 + x4 + x5 + x6 + x7 + x8 + x9
+"
+
+model_2factor <- "
+  verbal =~ x1 + x2 + x3 + x4 + x5 + x6
+  speed  =~ x7 + x8 + x9
+"
+
+model_3factor <- "
+  visual  =~ x1 + x2 + x3
+  textual =~ x4 + x5 + x6
+  speed   =~ x7 + x8 + x9
+"
+
+# Launch all three models in parallel
+job1 <- bgjm_start_lavaan(model_1factor, HolzingerSwineford1939,
+                          lavaan_fun = "cfa", job_name = "1-factor")
+job2 <- bgjm_start_lavaan(model_2factor, HolzingerSwineford1939,
+                          lavaan_fun = "cfa", job_name = "2-factor")
+job3 <- bgjm_start_lavaan(model_3factor, HolzingerSwineford1939,
+                          lavaan_fun = "cfa", job_name = "3-factor")
+
+# Wait for all to complete
+jobs <- c(job1, job2, job3)
+while (any(sapply(jobs, bgjm_status) == "running")) {
+  bgjm_poll(timeout_ms = 500)
+}
+
+# Collect and compare
+results <- lapply(jobs, bgjm_collect)
+fits <- lapply(results, function(x) x$result)
+
+# Compare model fit
+fit_comparison <- data.frame(
+  model = c("1-factor", "2-factor", "3-factor"),
+  cfi = sapply(fits, function(f) lavaan::fitMeasures(f, "cfi")),
+  rmsea = sapply(fits, function(f) lavaan::fitMeasures(f, "rmsea")),
+  aic = sapply(fits, function(f) lavaan::fitMeasures(f, "aic"))
+)
+
+print(fit_comparison)
+
+# Clean up all jobs
+lapply(jobs, bgjm_remove, delete_dir = TRUE)
+```
+
+
+## Working with tidyLPA
+
+### Basic Latent Profile Analysis
+
+```{r}
+#| eval: false
+library(tidyLPA)
+
+# Prepare data (iris dataset)
+iris_numeric <- iris[, 1:4]
+
+# Estimate profiles using mclust
+job_id <- bgjm_start_tidylpa(
+  data = iris_numeric,
+  n_profiles = 3,
+  models = 1,
+  package = "mclust",
+  job_name = "iris-lpa"
+)
+
+wait_for_job(job_id)
+result <- bgjm_collect(job_id)
+
+# Access tidyLPA results
+lpa_result <- result$result
+print(lpa_result)
+
+# Clean up
+bgjm_remove(job_id, delete_dir = TRUE)
+```
+
+### Model Comparison: Testing Multiple Profile Solutions
+
+```{r}
+#| eval: false
+
+# Test 2, 3, and 4 profile solutions in parallel
+jobs <- list()
+for (k in 2:4) {
+  jobs[[paste0("k", k)]] <- bgjm_start_tidylpa(
+    data = iris_numeric,
+    n_profiles = k,
+    models = 1,
+    package = "mclust",
+    job_name = paste0("lpa-k", k)
+  )
+}
+
+# Wait for all jobs
+for (job in jobs) {
+  wait_for_job(job)
+}
+
+# Collect and compare fit statistics
+results <- lapply(jobs, bgjm_collect)
+
+# Extract model fit information
+fit_stats <- data.frame(
+  n_profiles = 2:4,
+  AIC = sapply(results, function(r) r$result[[1]]$fit$AIC),
+  BIC = sapply(results, function(r) r$result[[1]]$fit$BIC)
+)
+
+print(fit_stats)
+
+# Clean up all jobs
+lapply(jobs, bgjm_remove, delete_dir = TRUE)
+```
+
+### Using Mplus Backend
+
+If you have Mplus installed:
+
+```{r}
+#| eval: false
+
+# Rename columns for Mplus compatibility (no dots allowed)
+iris_mplus <- iris_numeric
+names(iris_mplus) <- c("Sepal_Length", "Sepal_Width",
+                        "Petal_Length", "Petal_Width")
+
+job_id <- bgjm_start_tidylpa(
+  data = iris_mplus,
+  n_profiles = 3,
+  models = 1,
+  package = "Mplus",  # Note: "Mplus" not "mplus"
+  job_name = "iris-lpa-mplus"
+)
+
+wait_for_job(job_id, max_iterations = 200)  # Mplus can take longer
+result <- bgjm_collect(job_id)
+print(result$result)
+
+# Clean up
+bgjm_remove(job_id, delete_dir = TRUE)
+```
+
+
+### Best Practice Workflow
+
+```{r}
+#| eval: false
+
+# 1. Set up persistent storage
+output_dir <- "~/my_project/analyses"
+dir.create(output_dir, showWarnings = FALSE, recursive = TRUE)
+
+# 2. Run job with persistent storage
+job_id <- bgjm_start_lavaan(
+  model_syntax, HolzingerSwineford1939,
+  lavaan_fun = "cfa",
+  output_base = output_dir,
+  return_strategy = "rds"  # Also save to disk
+)
+
+# 3. Collect results
+wait_for_job(job_id)
+result <- bgjm_collect(job_id)
+
+# 4. Optionally save in project-specific format
+saveRDS(result$result, file.path(output_dir, "final_model.rds"))
+
+# 5. Keep job dir for logs and reproducibility
+bgjm_remove(job_id, delete_dir = FALSE)
+```
+
+### When to Use Temporary Storage
+
+Temporary storage is fine for:
+
+- Quick exploratory analyses
+- Testing/debugging code
+- Short interactive sessions where you collect immediately
+
+```{r}
+#| eval: false
+
+# Quick test - collect and clean up immediately
+job_id <- bgjm_start_lavaan(model_syntax, HolzingerSwineford1939, "cfa")
+wait_for_job(job_id)
+result <- bgjm_collect(job_id, auto_remove = TRUE)
+```
+
+## Error Handling and Job Management
+
+### Killing Long-Running Jobs
+
+If a job is taking too long:
+
+```{r}
+#| eval: false
+
+# Launch a job
+job_id <- bgjm_start_lavaan(model_syntax, HolzingerSwineford1939, "cfa")
+
+# Changed your mind? Kill it
+bgjm_kill(job_id)
+
+# Check status
+print(bgjm_status(job_id))  # Should be "error"
+
+# Clean up
+bgjm_remove(job_id, delete_dir = TRUE)
+```
+
+### Handling Failed Jobs
+
+```{r}
+#| eval: false
+
+# Try to collect a potentially failed job
+result <- tryCatch(
+  bgjm_collect(job_id),
+  error = function(e) {
+    message("Job failed!")
+    message(e$message)
+
+    # Read logs to diagnose
+    stderr <- bgjm_read_stderr(job_id)
+    cat("Error log:\n", stderr, sep = "\n")
+
+    return(NULL)
+  }
+)
+
+# Always clean up, even after errors
+if (is.null(result)) {
+  bgjm_remove(job_id, delete_dir = TRUE)
+}
+```
+
+### Setting Seeds for Reproducibility
+
+```{r}
+#| eval: false
+
+job_id <- bgjm_start_lavaan(
+  model_syntax, HolzingerSwineford1939,
+  lavaan_fun = "cfa",
+  seed = 42  # Reproducible bootstrap or random starting values
+)
+
+wait_for_job(job_id)
+result <- bgjm_collect(job_id, auto_remove = TRUE)
+```
+
+# Best Practices
+
+## 1. Always Clean Up
+
+Use `on.exit()` for automatic cleanup in functions:
+
+```{r}
+#| eval: false
+
+analyze_model <- function(model, data) {
+  job_id <- bgjm_start_lavaan(model, data, "cfa")
+
+  # Ensure cleanup even if function errors
+  on.exit({
+    if (exists("job_id") && !is.null(job_id)) {
+      bgjm_remove(job_id, delete_dir = TRUE)
+    }
+  }, add = TRUE)
+
+  wait_for_job(job_id)
+  result <- bgjm_collect(job_id)
+  return(result$result)
+}
+```
+
+## 2. Check Status Before Collecting
+
+```{r}
+#| eval: false
+
+status <- bgjm_status(job_id)
+
+if (status == "finished") {
+  result <- bgjm_collect(job_id)
+  print(summary(result$result))
+} else if (status == "error") {
+  message("Job failed - check logs")
+  stderr <- bgjm_read_stderr(job_id)
+  cat(stderr, sep = "\n")
+}
+
+# Clean up regardless
+bgjm_remove(job_id, delete_dir = TRUE)
+```
+
+## 3. Use Descriptive Job Names
+
+```{r}
+#| eval: false
+
+# Good - easy to identify later, uses your exact name
+job_id <- bgjm_start_lavaan(
+  model, data, "cfa",
+  job_name = "holzinger-3factor-cfa-bootstrap"
+)
+print(job_id)
+# [1] "holzinger-3factor-cfa-bootstrap"
+
+# OK but less specific - uses default "lavaan-cfa"
+job_id <- bgjm_start_lavaan(model, data, "cfa")
+print(job_id)
+# [1] "lavaan-cfa"
+```
+
+## 4. Monitor Long-Running Jobs
+
+```{r}
+#| eval: false
+
+# For very long jobs, check periodically
+job_id <- bgjm_start_lavaan(
+  model_syntax, HolzingerSwineford1939,
+  "cfa",
+  bootstrap = 5000,
+  job_name = "long-bootstrap"
+)
+
+# Check every 30 seconds
+while (bgjm_status(job_id) == "running") {
+  message("Job still running... ", Sys.time())
+  bgjm_poll(timeout_ms = 30000)
+}
+
+result <- bgjm_collect(job_id, auto_remove = TRUE)
+```
+
+# Troubleshooting
+
+## Job Registry Management
+
+The job registry is stored in memory and lost when R exits. If you lose track of jobs:
+
+```{r}
+#| eval: false
+
+# List all jobs
+all_jobs <- bgjm_list()
+print(all_jobs)
+
+# Clean up finished jobs
+finished_jobs <- all_jobs$id[all_jobs$status == "finished"]
+for (job in finished_jobs) {
+  bgjm_remove(job, delete_dir = TRUE)
+}
+
+# Kill and remove stuck jobs
+running_jobs <- all_jobs$id[all_jobs$status == "running"]
+for (job in running_jobs) {
+  bgjm_kill(job)
+  bgjm_remove(job, delete_dir = TRUE)
+}
+```
+
+## Common Issues
+
+### Issue: "Cannot collect a running job"
+
+**Solution**: Wait for job to finish first.
+
+```{r}
+#| eval: false
+wait_for_job(job_id)
+result <- bgjm_collect(job_id)
+```
+
+### Issue: "Unknown job_id"
+
+**Solution**: Job was already removed or R session was restarted. The registry is in-memory only.
+
+### Issue: tidyLPA/lavaan not found in child process
+
+**Solution**: Packages are loaded automatically, but ensure they're installed:
+
+```{r}
+#| eval: false
+
+# Check installation
+if (!require("lavaan")) install.packages("lavaan")
+if (!require("tidyLPA")) install.packages("tidyLPA")
+```
+
+### Issue: Mplus variable naming errors
+
+**Solution**: Mplus requires variable names to be alphanumeric + underscore only (no dots):
+
+```{r}
+#| eval: false
+
+# Bad - has dots
+iris_bad <- iris[, 1:4]  # Sepal.Length, etc.
+
+# Good - replace dots with underscores
+iris_good <- iris[, 1:4]
+names(iris_good) <- gsub("\\.", "_", names(iris_good))
+```
+
+# Session Info
+
+```{r}
+#| eval: true
+sessionInfo()
+```

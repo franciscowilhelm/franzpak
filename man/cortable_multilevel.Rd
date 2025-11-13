@@ -9,6 +9,7 @@ cortable_multilevel(
   varnames,
   grp,
   varlabels = NULL,
+  between = NULL,
   wpv = FALSE,
   use.001 = TRUE,
   return_list = FALSE
@@ -22,6 +23,8 @@ cortable_multilevel(
 \item{grp}{the variable name that identifies the level-2 group as character.}
 
 \item{varlabels}{character vector giving labels of the variables.}
+
+\item{between}{character vector of variables that vary only at Level 2.}
 
 \item{wpv}{Use Within-Person Variance (WPV) instead of ICC. WPV = 1-ICC.}
 
