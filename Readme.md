@@ -1,0 +1,86 @@
+
+<!-- README.md is generated from README.Rmd. Please edit that file -->
+
+# franzpak
+
+<!-- badges: start -->
+
+<!-- badges: end -->
+
+I created franzpak to collect some utility functions that I have written
+over the years. They stem from my routine use cases for R, which
+include: - clean/tidy/transform social science questionnaire data -
+analyze questionnaire data using quantitative methods - including
+interfacing of R with Mplus thanks to the excellent MplusAutomation
+(e.g., `coef_wrapper()`) - including analysis of multilevel / diary data
+(e.g., `cortable_multilevel`).
+
+Therefore, users may find useful functions here for similar purposes.
+
+## Functions
+
+### Psychometric Scale Scoring
+
+- `scoreItemsMulti()` - Score multiple scales at once using
+  `psych::scoreItems()`. Automatically detects reverse-coded items via
+  PCA, calculates Cronbach’s alpha, and excludes participants with \>1/3
+  missing items.
+- `scoreItemsMultiFast()` - Fast scoring of multiple scales using
+  `psych::scoreFast()`. No automatic reverse-coding detection or alpha
+  calculation; designed for speed and small samples where PCA might
+  fail.
+
+### Multilevel/Diary Data Analysis
+
+- `cortable_multilevel()` - Create APA-formatted correlation tables for
+  two-level data with between-person correlations (upper triangle) and
+  within-person correlations (lower triangle). Calculates ICCs and
+  handles Level-2 variables.
+- `pivot_longer_multilevel()` - Transform wide two-level repeated
+  measures data into long format, creating `id` (Level-2) and `time`
+  (Level-1) columns.
+
+### Mplus Integration
+
+- `coef_wrapper()` - Extract and format coefficients from Mplus models
+  (via MplusAutomation). Splits labels into DV/IV columns, supports
+  Bayesian models, and can add confidence intervals.
+
+### Background Job Management
+
+Functions for running long model fits (lavaan, tidyLPA) in isolated
+background R sessions:
+
+- `bgjm_start_lavaan()` - Launch lavaan model (`sem()`, `cfa()`, or
+  `lavaan()`) in background
+- `bgjm_start_tidylpa()` - Launch tidyLPA `estimate_profiles()` in
+  background (supports mclust and Mplus packages; requires tidyLPA \>=
+  1.0.0)
+- `bgjm_list()` - List all registered background jobs with their status
+- `bgjm_status()` - Query status of a specific job (`"running"`,
+  `"finished"`, or `"error"`)
+- `bgjm_poll()` - Poll all background jobs to check for updates
+- `bgjm_collect()` - Retrieve results from a completed job
+- `bgjm_kill()` - Terminate a running job
+- `bgjm_remove()` - Remove job from registry (optionally delete working
+  directory)
+- `bgjm_read_stdout()` - Read captured standard output from a job
+- `bgjm_read_stderr()` - Read captured standard error from a job
+
+## Installation
+
+You can install the development version of franzpak like so:
+
+``` r
+devtools::install_github("franciscowilhelm/franzpak")
+```
+
+Currently I do not plan to submit to CRAN.
+
+## Disclaimer
+
+Generative AI was used in the development of some of these functions.
+
+## License
+
+Unless otherwise stated, MIT License.
