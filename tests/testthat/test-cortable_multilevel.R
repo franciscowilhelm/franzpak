@@ -72,15 +72,68 @@ test_that("formatted, numeric, and p-values tables have consistent structure", {
   expect_equal(result$formatted_table$Variable, result$numeric_table_p_values$Variable)
 })
 
-# Test with variable labels
-test_that("cortable_multilevel works with variable labels", {
+# Test with manual variable labels
+test_that("cortable_multilevel works with manual variable labels", {
   result <- cortable_multilevel(mc_twolevel, c("Y", "M", "X"), "CLUSTER",
                                varlabels = c("Outcome", "Mediator", "Predictor"),
                                return_list = TRUE)
-  
+
   expect_true(all(grepl("Outcome|Mediator|Predictor", result$formatted_table$Variable)))
   expect_true(all(grepl("Outcome|Mediator|Predictor", result$numeric_table$Variable)))
   expect_true(all(grepl("Outcome|Mediator|Predictor", result$numeric_table_p_values$Variable)))
+})
+
+# Test auto-detection of variable labels from attributes
+test_that("cortable_multilevel auto-detects variable labels from attributes", {
+  # Create a test dataframe with label attributes (as set by haven/sjlabelled)
+  mc_labeled <- mc_twolevel
+  attr(mc_labeled$Y, "label") <- "Outcome Variable"
+  attr(mc_labeled$M, "label") <- "Mediator Variable"
+  attr(mc_labeled$X, "label") <- "Predictor Variable"
+
+  result <- cortable_multilevel(mc_labeled, c("Y", "M", "X"), "CLUSTER",
+                               return_list = TRUE)
+
+  # Check that auto-detected labels are used
+  expect_true(any(grepl("Outcome Variable", result$formatted_table$Variable)))
+  expect_true(any(grepl("Mediator Variable", result$formatted_table$Variable)))
+  expect_true(any(grepl("Predictor Variable", result$formatted_table$Variable)))
+
+  # Check consistency across all tables
+  expect_true(any(grepl("Outcome Variable", result$numeric_table$Variable)))
+  expect_true(any(grepl("Outcome Variable", result$numeric_table_p_values$Variable)))
+})
+
+# Test that manual labels override auto-detected labels
+test_that("manual labels override auto-detected labels", {
+  # Create a test dataframe with label attributes
+  mc_labeled <- mc_twolevel
+  attr(mc_labeled$Y, "label") <- "Auto Label Y"
+  attr(mc_labeled$M, "label") <- "Auto Label M"
+  attr(mc_labeled$X, "label") <- "Auto Label X"
+
+  # Provide manual labels that should override
+  result <- cortable_multilevel(mc_labeled, c("Y", "M", "X"), "CLUSTER",
+                               varlabels = c("Manual Y", "Manual M", "Manual X"),
+                               return_list = TRUE)
+
+  # Check that manual labels are used, not auto-detected ones
+  expect_true(any(grepl("Manual Y", result$formatted_table$Variable)))
+  expect_true(any(grepl("Manual M", result$formatted_table$Variable)))
+  expect_true(any(grepl("Manual X", result$formatted_table$Variable)))
+  expect_false(any(grepl("Auto Label", result$formatted_table$Variable)))
+})
+
+# Test fallback to variable names when no labels present
+test_that("falls back to variable names when no labels are present", {
+  # Use dataframe without label attributes (default mc_twolevel)
+  result <- cortable_multilevel(mc_twolevel, c("Y", "M", "X"), "CLUSTER",
+                               return_list = TRUE)
+
+  # Should use variable names as fallback
+  expect_true(any(grepl("\\bY\\b", result$formatted_table$Variable)))
+  expect_true(any(grepl("\\bM\\b", result$formatted_table$Variable)))
+  expect_true(any(grepl("\\bX\\b", result$formatted_table$Variable)))
 })
 
 # Test with example data

@@ -1,9 +1,35 @@
+#' Extract variable labels from dataframe
+#'
+#' Helper function to extract variable labels from dataframe columns.
+#' Labels can be set by haven or sjlabelled packages and are stored as
+#' the "label" attribute on each column.
+#'
+#' @param df Dataframe containing variables
+#' @param varnames Character vector of variable names to extract labels for
+#'
+#' @return Character vector of labels (or variable names if no label found)
+#' @noRd
+extract_var_labels <- function(df, varnames) {
+  sapply(varnames, function(var) {
+    if (var %in% names(df)) {
+      label <- attr(df[[var]], "label", exact = TRUE)
+      if (!is.null(label) && is.character(label) && length(label) == 1 && nzchar(label)) {
+        return(label)
+      }
+    }
+    return(var)  # Fall back to variable name if no label found
+  }, USE.NAMES = FALSE)
+}
+
 #' Correlation table for two-level data
 #'
 #' @param df the dataframe to be used, should contain all variables including grouping variable.
 #' @param varnames the variable names as character vector.
 #' @param grp the variable name that identifies the level-2 group as character.
-#' @param varlabels character vector giving labels of the variables.
+#' @param varlabels character vector giving labels of the variables. If NULL (default),
+#'   the function will attempt to auto-detect labels from the dataframe using the "label"
+#'   attribute (set by haven or sjlabelled packages). If no labels are found, variable
+#'   names will be used.
 #' @param between character vector of variables that vary only at Level 2.
 #' @param wpv Use Within-Person Variance (WPV) instead of ICC. WPV = 1-ICC.
 #' @param use.001 Don't use *** to mark p < .001; this makes the table more concise.
@@ -22,6 +48,15 @@
 #' @examples
 #' # Return formatted table only (backward compatible)
 #' cortable_multilevel(mc_twolevel, c("Y", "M", "X"), "CLUSTER")
+#'
+#' # Auto-detect variable labels from haven/sjlabelled attributes
+#' # If your dataframe has label attributes (e.g., from haven::read_spss()),
+#' # they will be automatically detected and used in the table
+#' cortable_multilevel(mc_twolevel, c("Y", "M", "X"), "CLUSTER")
+#'
+#' # Manual labels override auto-detection
+#' cortable_multilevel(mc_twolevel, c("Y", "M", "X"), "CLUSTER",
+#'                     varlabels = c("Outcome", "Mediator", "Predictor"))
 #'
 #' # Return both formatted and numeric tables
 #' result <- cortable_multilevel(mc_twolevel, c("Y", "M", "X"), "CLUSTER", return_list = TRUE)
@@ -95,16 +130,19 @@ cortable_multilevel <- function(df, varnames, grp, varlabels = NULL, between = N
   within_vars <- setdiff(varnames, between_vars)
   varnames_ordered <- c(within_vars, between_vars)
 
-  # Reorder optional labels
+  # Handle variable labels: manual override, auto-detection, or fallback to variable names
   if(!is.null(varlabels)) {
+    # User provided manual labels - use those
     if(length(varlabels) != length(varnames)) {
       stop("Length of `varlabels` must match length of `varnames`.")
     }
     varlabels_ordered <- varlabels[match(varnames_ordered, varnames)]
   } else {
-    varlabels_ordered <- NULL
+    # Auto-detect labels from dataframe attributes (haven/sjlabelled)
+    auto_labels <- extract_var_labels(df, varnames)
+    varlabels_ordered <- auto_labels[match(varnames_ordered, varnames)]
   }
-  display_labels <- if(!is.null(varlabels_ordered)) varlabels_ordered else varnames_ordered
+  display_labels <- varlabels_ordered
 
   # Calculate ICC or WPV (Within-Person Variance) - keep numeric for later formatting
   if(wpv == FALSE) {

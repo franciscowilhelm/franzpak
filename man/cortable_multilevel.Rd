@@ -22,7 +22,10 @@ cortable_multilevel(
 
 \item{grp}{the variable name that identifies the level-2 group as character.}
 
-\item{varlabels}{character vector giving labels of the variables.}
+\item{varlabels}{character vector giving labels of the variables. If NULL (default),
+the function will attempt to auto-detect labels from the dataframe using the "label"
+attribute (set by haven or sjlabelled packages). If no labels are found, variable
+names will be used.}
 
 \item{between}{character vector of variables that vary only at Level 2.}
 
@@ -48,6 +51,15 @@ Correlation table for two-level data
 \examples{
 # Return formatted table only (backward compatible)
 cortable_multilevel(mc_twolevel, c("Y", "M", "X"), "CLUSTER")
+
+# Auto-detect variable labels from haven/sjlabelled attributes
+# If your dataframe has label attributes (e.g., from haven::read_spss()),
+# they will be automatically detected and used in the table
+cortable_multilevel(mc_twolevel, c("Y", "M", "X"), "CLUSTER")
+
+# Manual labels override auto-detection
+cortable_multilevel(mc_twolevel, c("Y", "M", "X"), "CLUSTER",
+                    varlabels = c("Outcome", "Mediator", "Predictor"))
 
 # Return both formatted and numeric tables
 result <- cortable_multilevel(mc_twolevel, c("Y", "M", "X"), "CLUSTER", return_list = TRUE)

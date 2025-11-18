@@ -1,6 +1,6 @@
 Package: franzpak
 Title: Miscellaneous functions for social science data analysis
-Version: 0.1
+Version: 0.1.1
 Authors@R: 
     person("Francisco", "Wilhelm", , "francisco.wilhelm@unibe.ch", role = c("aut", "cre"),
            comment = c(ORCID = "0000-0002-1717-7975"))
