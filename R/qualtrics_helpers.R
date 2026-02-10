@@ -41,27 +41,53 @@
 #' - `response_labels`: named list of response labels.
 #'
 #' @examples
-#' path <- system.file("extdata", "codebook_qualtrics_gen.csv", package = "franzpak")
-#' if (nzchar(path)) {
-#'   out <- qmatrix_generator(
-#'     inpfile = path,
-#'     varcol = "Skalenvariable",
-#'     itemcol = "Items",
-#'     itemformat = "stemonly",
-#'     responses = TRUE,
-#'     leadin = "Instruktion",
-#'     resp = "Antwort",
-#'     resplabel = "Antwortlabel"
-#'   )
-#'   out$scalenames
-#'   tmp <- tempfile(fileext = ".txt")
-#'   cat(out$text, sep = "\n", file = tmp)
-#'   # Not run: typical output path
-#'   # \dontrun{
-#'   # dir.create("output", showWarnings = FALSE)
-#'   # cat(out$text, sep = "\n", file = "output/qualtrics_export.txt")
-#'   # }
-#' }
+#' codebook <- data.frame(
+#'   scale = rep(c("submarine", "lunar"), each = 5),
+#'   item = c(
+#'     "I am licensed to operate nuclear submarines.",
+#'     "I can safely dock a submarine in a pineapple.",
+#'     "I navigate by the stars while underwater.",
+#'     "I have befriended at least one dolphin crew member.",
+#'     "I can calculate torpedo trajectories in my head.",
+#'     "I have walked on the Moon during lunch.",
+#'     "I can fix a rover with duct tape.",
+#'     "I keep a spare spacesuit in my closet.",
+#'     "I speak fluent Martian.",
+#'     "I have a favorite crater."
+#'   ),
+#'   instruction = c(
+#'     "How much do you agree with these statements?",
+#'     rep(NA_character_, 4),
+#'     "How true are these statements about you?",
+#'     rep(NA_character_, 4)
+#'   ),
+#'   response = rep(1:5, 2),
+#'   response_label = rep(
+#'     c("Strongly disagree", "Disagree", "Neutral", "Agree", "Strongly agree"),
+#'     2
+#'   ),
+#'   stringsAsFactors = FALSE
+#' )
+#' tmp <- tempfile(fileext = ".csv")
+#' utils::write.csv(codebook, tmp, row.names = FALSE)
+#' out <- qmatrix_generator(
+#'   inpfile = tmp,
+#'   varcol = "scale",
+#'   itemcol = "item",
+#'   itemformat = "stemonly",
+#'   responses = TRUE,
+#'   leadin = "instruction",
+#'   resp = "response",
+#'   resplabel = "response_label"
+#' )
+#' out$scalenames
+#' tmp_out <- tempfile(fileext = ".txt")
+#' cat(out$text, sep = "\n", file = tmp_out)
+#' # Not run: typical output path
+#' # \dontrun{
+#' # dir.create("output", showWarnings = FALSE)
+#' # cat(out$text, sep = "\n", file = "output/qualtrics_export.txt")
+#' # }
 #' @export
 qmatrix_generator <- function(
   inpfile,
