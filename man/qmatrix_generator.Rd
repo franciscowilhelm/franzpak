@@ -13,7 +13,10 @@ qmatrix_generator(
   responses = FALSE,
   leadin = NULL,
   resp = NULL,
-  resplabel = NULL
+  resplabel = NULL,
+  build_text = TRUE,
+  clean_text = stringr::str_squish,
+  keep_order = TRUE
 )
 }
 \arguments{
@@ -39,23 +42,37 @@ used when \code{responses = TRUE}).}
 
 \item{resplabel}{Column name or index containing response labels (only used
 when \code{responses = TRUE}).}
+
+\item{build_text}{Logical; if \code{TRUE}, assemble Qualtrics-ready text blocks.}
+
+\item{clean_text}{A function applied to each item text vector when
+\code{build_text = TRUE} (defaults to \code{stringr::str_squish}). Set to \code{NULL} to
+skip cleaning.}
+
+\item{keep_order}{Logical; if \code{TRUE}, preserve the first-appearance order of
+scales in the input file when assembling text.}
 }
 \value{
 A list with elements:
 \itemize{
 \item \code{scalenames}: character vector of scale names.
 \item \code{itemtext_list}: named list of item texts per scale.
-\item \code{text}: character vector of assembled Qualtrics matrix question text.
+\item \code{text}: character vector of assembled Qualtrics matrix question text or
+\code{NULL} when \code{build_text = FALSE}.
 \item \code{items}: tibble with \code{scale}, \code{itemno}, and \code{itemtext} columns.
 \item \code{responses_leadin_list}: named list of lead-ins and responses (or \code{NULL}).
+\item \code{leadins}: named vector of lead-in text.
+\item \code{response_labels}: named list of response labels.
 }
 }
 \description{
 Build Qualtrics matrix question text and item lists from a codebook-style
-input file. The function supports files in \code{.csv}, \code{.xlsx}/\code{.xls}, and
-LibreOffice \code{.ods} formats and can parse two item naming conventions:
-items encoded as \code{scale_itemnumber} (e.g., \code{stress_1}) or a \code{stemonly}
-format where the scale name is repeated for each item.
+input file. To write a Qualtrics \code{.txt} file, call
+\code{cat(out$text, sep = "\\n", file = "your_file.txt")} on the result.
+The function supports files in \code{.csv}, \code{.xlsx}/\code{.xls}, and LibreOffice
+\code{.ods} formats and can parse two item naming conventions: items encoded as
+\code{scale_itemnumber} (e.g., \code{stress_1}) or a \code{stemonly} format where the scale
+name is repeated for each item.
 }
 \examples{
 path <- system.file("extdata", "codebook_qualtrics_gen.csv", package = "franzpak")
@@ -71,5 +88,7 @@ if (nzchar(path)) {
     resplabel = "Antwortlabel"
   )
   out$scalenames
+  tmp <- tempfile(fileext = ".txt")
+  cat(out$text, sep = "\\n", file = tmp)
 }
 }
