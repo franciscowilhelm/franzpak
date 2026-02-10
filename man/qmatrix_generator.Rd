@@ -90,5 +90,10 @@ if (nzchar(path)) {
   out$scalenames
   tmp <- tempfile(fileext = ".txt")
   cat(out$text, sep = "\\n", file = tmp)
+  # Not run: typical output path
+  # \\dontrun{
+  # dir.create("output", showWarnings = FALSE)
+  # cat(out$text, sep = "\\n", file = "output/qualtrics_export.txt")
+  # }
 }
 }
