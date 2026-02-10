@@ -30,15 +30,20 @@
 #' - `responses_leadin_list`: named list of lead-ins and responses (or `NULL`).
 #'
 #' @examples
-#' tmp <- tempfile(fileext = ".csv")
-#' dat <- data.frame(
-#'   var = c("scale_1", "scale_2", "scale_3"),
-#'   item = c("Item one", "Item two", "Item three"),
-#'   stringsAsFactors = FALSE
-#' )
-#' utils::write.csv(dat, tmp, row.names = FALSE)
-#' out <- qualtrics_matrixq_generator(tmp, varcol = "var", itemcol = "item")
-#' str(out$text)
+#' path <- system.file("extdata", "codebook_qualtrics_gen.csv", package = "franzpak")
+#' if (nzchar(path)) {
+#'   out <- qualtrics_matrixq_generator(
+#'     inpfile = path,
+#'     varcol = "Skalenvariable",
+#'     itemcol = "Items",
+#'     itemformat = "stemonly",
+#'     responses = TRUE,
+#'     leadin = "Instruktion",
+#'     resp = "Antwort",
+#'     resplabel = "Antwortlabel"
+#'   )
+#'   out$scalenames
+#' }
 #' @export
 qualtrics_matrixq_generator <- function(
   inpfile,

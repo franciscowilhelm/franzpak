@@ -1,5 +1,5 @@
 test_that("qualtrics_matrixq_generator reads stemonly codebook and responses", {
-  path <- testthat::test_path("..", "..", "exampleData", "codebook_qualtrics_gen.csv")
+  path <- testthat::test_path("..", "..", "inst", "extdata", "codebook_qualtrics_gen.csv")
 
   out <- qualtrics_matrixq_generator(
     inpfile = path,
