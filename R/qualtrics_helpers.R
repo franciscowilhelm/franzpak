@@ -32,7 +32,7 @@
 #' @examples
 #' path <- system.file("extdata", "codebook_qualtrics_gen.csv", package = "franzpak")
 #' if (nzchar(path)) {
-#'   out <- qualtrics_matrixq_generator(
+#'   out <- qmatrix_generator(
 #'     inpfile = path,
 #'     varcol = "Skalenvariable",
 #'     itemcol = "Items",
@@ -45,7 +45,7 @@
 #'   out$scalenames
 #' }
 #' @export
-qualtrics_matrixq_generator <- function(
+qmatrix_generator <- function(
   inpfile,
   sheet = NULL,
   varcol,
@@ -173,7 +173,172 @@ qualtrics_matrixq_generator <- function(
   )
 }
 
-# # # todo: integrate the output returned from qualtrics_matrixq_generator function as x
+#' Assemble and write Qualtrics matrix question text
+#'
+#' Build Qualtrics-ready text from a codebook using
+#' [qmatrix_generator()] and optionally write it to a `.txt` file.
+#' This helper keeps the original scale order from the input file and formats
+#' response labels as `"code label"` when available.
+#'
+#' @param inpfile Path to the input codebook file.
+#' @param outfile Optional path to write the assembled text.
+#' @param sheet Sheet name or index for spreadsheet inputs (`.xlsx`, `.xls`,
+#'   `.ods`). Ignored for `.csv` inputs.
+#' @param varcol,itemcol Column name or index of the variable/scale label and
+#'   item text columns, respectively.
+#' @param itemformat Item naming format. Use `"_number"` (default) for
+#'   `scale_itemnumber` labels or `"stemonly"` for repeated scale names.
+#' @param responses Logical; if `TRUE` and `itemformat = "stemonly"`, extract
+#'   optional lead-in text and response labels from the same sheet.
+#' @param leadin Column name or index containing lead-in/instruction text (only
+#'   used when `responses = TRUE`).
+#' @param resp Column name or index containing response codes (optional, only
+#'   used when `responses = TRUE`).
+#' @param resplabel Column name or index containing response labels (only used
+#'   when `responses = TRUE`).
+#' @param clean_text A function applied to each item text vector (defaults to
+#'   [stringr::str_squish]). Set to `NULL` to skip cleaning.
+#' @param keep_order Logical; if `TRUE`, preserve the first-appearance order of
+#'   scales in the input file.
+#'
+#' @return A list with elements:
+#' - `text`: character vector of assembled Qualtrics text blocks.
+#' - `codebook`: output of [qmatrix_generator()].
+#' - `scalenames`: scale names in output order.
+#' - `leadins`: named vector of lead-in text.
+#' - `response_labels`: named list of response labels.
+#'
+#' @examples
+#' path <- system.file("extdata", "codebook_qualtrics_gen.csv", package = "franzpak")
+#' if (nzchar(path)) {
+#'   out <- qmatrix_to_txt(
+#'     inpfile = path,
+#'     varcol = "Skalenvariable",
+#'     itemcol = "Items",
+#'     itemformat = "stemonly",
+#'     responses = TRUE,
+#'     leadin = "Instruktion",
+#'     resp = "Antwort",
+#'     resplabel = "Antwortlabel"
+#'   )
+#'   out$scalenames
+#' }
+#' @export
+qmatrix_to_txt <- function(
+  inpfile,
+  outfile = NULL,
+  sheet = NULL,
+  varcol,
+  itemcol,
+  itemformat = c("_number", "stemonly"),
+  responses = TRUE,
+  leadin = NULL,
+  resp = NULL,
+  resplabel = NULL,
+  clean_text = stringr::str_squish,
+  keep_order = TRUE
+) {
+  itemformat <- match.arg(itemformat)
+
+  codebook <- qmatrix_generator(
+    inpfile = inpfile,
+    sheet = sheet,
+    varcol = varcol,
+    itemcol = itemcol,
+    itemformat = itemformat,
+    responses = responses,
+    leadin = leadin,
+    resp = resp,
+    resplabel = resplabel
+  )
+
+  scalenames <- codebook$scalenames
+  if (keep_order) {
+    x <- .qm_read_input(inpfile, sheet = sheet)
+    varcol <- .qm_resolve_col(x, varcol, "varcol")
+    scalenames <- unique(stats::na.omit(x[[varcol]]))
+  }
+
+  leadins <- setNames(character(0), character(0))
+  response_labels <- setNames(vector("list", 0), character(0))
+  if (!is.null(codebook$responses_leadin_list)) {
+    leadins <- purrr::map_chr(codebook$responses_leadin_list, function(x) {
+      leadin_vals <- x$leadin
+      if (length(leadin_vals) == 0) {
+        ""
+      } else {
+        as.character(leadin_vals[1])
+      }
+    })
+    names(leadins) <- codebook$scalenames
+
+    response_labels <- purrr::map(codebook$responses_leadin_list, function(x) {
+      r <- x$responses
+      if (is.null(r)) {
+        return(character(0))
+      }
+      if (is.data.frame(r)) {
+        if (all(c("code", "label") %in% names(r))) {
+          return(paste(r$code, r$label))
+        }
+        return(as.character(r[[1]]))
+      }
+      as.character(r)
+    })
+    names(response_labels) <- codebook$scalenames
+  }
+
+  itemtext_list <- codebook$itemtext_list
+  if (!is.null(clean_text)) {
+    itemtext_list <- purrr::map(itemtext_list, clean_text)
+  }
+
+  text <- purrr::map_chr(scalenames, function(scale_name) {
+    leadin_text <- leadins[[scale_name]]
+    if (is.null(leadin_text)) {
+      leadin_text <- ""
+    }
+    heading <- if (nzchar(leadin_text)) {
+      stringr::str_c(scale_name, ". ", leadin_text)
+    } else {
+      stringr::str_c(scale_name, ".")
+    }
+
+    item_lines <- itemtext_list[[scale_name]]
+    if (is.null(item_lines)) {
+      item_lines <- character(0)
+    }
+    resp_lines <- response_labels[[scale_name]]
+    if (is.null(resp_lines)) {
+      resp_lines <- character(0)
+    }
+
+    stringr::str_c(
+      heading,
+      "",
+      stringr::str_c(item_lines, collapse = "\n"),
+      "",
+      stringr::str_c(resp_lines, collapse = "\n"),
+      "",
+      sep = "\n",
+      collapse = "\n"
+    )
+  })
+
+  if (!is.null(outfile)) {
+    write_qualtricsgen(text, outfile)
+  }
+
+  list(
+    text = text,
+    codebook = codebook,
+    scalenames = scalenames,
+    leadins = leadins,
+    response_labels = response_labels
+  )
+}
+
+# # # todo: integrate the output returned from qmatrix_generator function as x
 qualtrics_matrixq_responsescales <- function(
   inpfile,
   sheet = NULL,
