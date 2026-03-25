@@ -205,8 +205,8 @@ qmatrix_generator <- function(
     scalenames_out <- scalenames_out[scalenames_out %in% scalenames]
   }
 
-  leadins <- setNames(character(0), character(0))
-  response_labels <- setNames(vector("list", 0), character(0))
+  leadins <- stats::setNames(character(0), character(0))
+  response_labels <- stats::setNames(vector("list", 0), character(0))
   if (!is.null(responses_leadin_list)) {
     leadins <- purrr::map_chr(responses_leadin_list, function(x) {
       leadin_vals <- x$leadin

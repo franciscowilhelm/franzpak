@@ -2,3 +2,16 @@
 ^\.Rproj\.user$
 ^LICENSE\.md$
 ^README\.Rmd$
+^\.DS_Store$
+^\.vscode$
+^AGENTS\.md$
+^CLAUDE\.md$
+^Readme\.md$
+^changelog_local\.md$
+^exampleData$
+^examples$
+^private$
+^vignettes$
+^vignettes/README\.md$
+^vignettes/background-jobs\.html$
+^vignettes/background-jobs_files$

@@ -65,6 +65,7 @@
 #' @param y Right-hand side.
 #' @return `x` when it is not `NULL`, otherwise `y`.
 #' @keywords internal
+#' @noRd
 `%||%` <- function(x, y) if (is.null(x)) y else x
 
 #' Launch a background job

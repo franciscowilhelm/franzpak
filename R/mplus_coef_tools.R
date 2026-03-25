@@ -74,6 +74,6 @@ coef_wrapper <- function(model, label_replace = NULL, params = c('regression'), 
 confint_wrapper <- function(model) {
   message("Experimental function, may be deprecated in favor coef_wrapper()")
   coefs <- coef(model, params = 'new') |> select(Label, est)
-  confints <- confint(model, params = c('new')) |> mutate(IV = str_replace_all(Label, label_replace))
+  confints <- confint(model, params = c('new'))
   left_join(coefs, confints, by = "Label")
 }

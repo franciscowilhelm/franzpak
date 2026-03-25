@@ -27,4 +27,9 @@
 #' @importFrom tidyselect contains
 #' @importFrom tidyselect starts_with
 ## usethis namespace: end
+
+utils::globalVariables(
+  c("...1", "...2", "DV", "IV", "Label", "est", "label_replace", "pval", "value")
+)
+
 NULL

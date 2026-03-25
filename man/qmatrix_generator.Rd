@@ -22,8 +22,8 @@ qmatrix_generator(
 \arguments{
 \item{inpfile}{Path to the input codebook file.}
 
-\item{sheet}{Sheet name or index for spreadsheet inputs (\code{.xlsx},
-\code{.xls}, \code{.ods}). Ignored for \code{.csv} inputs.}
+\item{sheet}{Sheet name or index for spreadsheet inputs (\code{.xlsx}, \code{.xls},
+\code{.ods}). Ignored for \code{.csv} inputs.}
 
 \item{varcol, itemcol}{Column name or index of the variable/scale label and
 item text columns, respectively.}
@@ -46,7 +46,7 @@ when \code{responses = TRUE}).}
 \item{build_text}{Logical; if \code{TRUE}, assemble Qualtrics-ready text blocks.}
 
 \item{clean_text}{A function applied to each item text vector when
-\code{build_text = TRUE} (defaults to \code{stringr::str_squish}). Set to \code{NULL} to
+\code{build_text = TRUE} (defaults to \link[stringr:str_trim]{stringr::str_squish}). Set to \code{NULL} to
 skip cleaning.}
 
 \item{keep_order}{Logical; if \code{TRUE}, preserve the first-appearance order of
@@ -68,7 +68,7 @@ A list with elements:
 \description{
 Build Qualtrics matrix question text and item lists from a codebook-style
 input file. To write a Qualtrics \code{.txt} file, call
-\code{cat(out$text, sep = "\\n", file = "your_file.txt")} on the result.
+\code{cat(out$text, sep = "\\\\n", file = "your_file.txt")} on the result.
 The function supports files in \code{.csv}, \code{.xlsx}/\code{.xls}, and LibreOffice
 \code{.ods} formats and can parse two item naming conventions: items encoded as
 \code{scale_itemnumber} (e.g., \code{stress_1}) or a \code{stemonly} format where the scale
@@ -116,10 +116,10 @@ out <- qmatrix_generator(
 )
 out$scalenames
 tmp_out <- tempfile(fileext = ".txt")
-cat(out$text, sep = "\\n", file = tmp_out)
+cat(out$text, sep = "\n", file = tmp_out)
 # Not run: typical output path
-# \\dontrun{
+# \dontrun{
 # dir.create("output", showWarnings = FALSE)
-# cat(out$text, sep = "\\n", file = "output/qualtrics_export.txt")
+# cat(out$text, sep = "\n", file = "output/qualtrics_export.txt")
 # }
 }
