@@ -17,7 +17,8 @@ Suggests:
     tidyLPA (>= 1.0.0),
     mclust,
     knitr,
-    rmarkdown
+    rmarkdown,
+    gt
 Config/testthat/edition: 3
 VignetteBuilder: knitr
 Imports: 

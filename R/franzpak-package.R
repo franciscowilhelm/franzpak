@@ -4,6 +4,8 @@
 ## usethis namespace: start
 #' @importFrom dplyr across
 #' @importFrom dplyr bind_cols
+#' @importFrom dplyr filter
+#' @importFrom dplyr if_else
 #' @importFrom dplyr left_join
 #' @importFrom dplyr mutate
 #' @importFrom dplyr select
@@ -23,13 +25,15 @@
 #' @importFrom tibble as_tibble
 #' @importFrom tibble tibble
 #' @importFrom tidyr pivot_longer
+#' @importFrom tidyr pivot_wider
 #' @importFrom tidyselect all_of
 #' @importFrom tidyselect contains
 #' @importFrom tidyselect starts_with
 ## usethis namespace: end
 
 utils::globalVariables(
-  c("...1", "...2", "DV", "IV", "Label", "est", "label_replace", "pval", "value")
+  c("...1", "...2", "DV", "IV", "Label", "LowerCI", "UpperCI",
+    "est", "label_replace", "pval", "se", "sig", "value")
 )
 
 NULL
