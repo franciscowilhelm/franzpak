@@ -92,8 +92,13 @@ coef_wrapper <- function(model, label_replace = NULL, params = c('regression'), 
 #' Wide regression coefficient table from Mplus model
 #'
 #' Produces a predictor × outcome table with nested sub-columns for each outcome.
-#' For ML models: estimate (starred when p < `sig_threshold`) and SE; optionally 95% CIs.
-#' For Bayesian models: estimate (starred when 95% CrI excludes zero), CrI lower, CrI upper.
+#' Display is controlled by `display_type`:
+#' - `"est_se"`: estimate (starred when p < `sig_threshold`) and SE. When the
+#'   model is Bayesian the footnote notes that p-values are one-tailed.
+#' - `"est_ci"`: estimate (starred when 95% CI/CrI excludes zero), LL, UL.
+#'
+#' `display_type` is auto-detected from the estimator when `NULL` (default):
+#' Bayesian models → `"est_ci"`, all others → `"est_se"`.
 #' The estimator is auto-detected from the model when `bayes = NULL` (default).
 #' Returns a `gt` table when the **gt** package is available, otherwise a plain tibble.
 #'
@@ -102,8 +107,9 @@ coef_wrapper <- function(model, label_replace = NULL, params = c('regression'), 
 #' @param params Which parameter types to extract (passed to MplusAutomation).
 #' @param bayes `NULL` (default) to auto-detect; `TRUE`/`FALSE` to override.
 #'   Warnings from conflicting explicit values are issued by [coef_wrapper()].
-#' @param addci Logical; include 95% CI columns for ML models (ignored when Bayesian).
-#' @param sig_threshold P-value threshold for significance stars (ML only, default 0.05).
+#' @param display_type `NULL` (default, auto-detect), `"est_se"` (estimate + SE,
+#'   p-value stars), or `"est_ci"` (estimate + CI LL/UL, interval-exclusion stars).
+#' @param sig_threshold P-value threshold for significance stars (`"est_se"` only, default 0.05).
 #' @param digits Number of decimal places (default 3).
 #' @param na_replace Character string to substitute for empty cells (predictors that
 #'   do not enter a given outcome). Common choices: `"-"` or `""`. `NULL` (default)
@@ -116,20 +122,24 @@ coef_wrapper <- function(model, label_replace = NULL, params = c('regression'), 
 #' \dontrun{
 #' m <- MplusAutomation::readModels("inst/extdata/ex5.11.out")
 #' coef_table_mplus(m)
-#' coef_table_mplus(m, addci = TRUE)
+#' coef_table_mplus(m, display_type = "est_ci")
 #' coef_table_mplus(m, na_replace = "-")
 #' coef_table_mplus(m, label_replace = c("F3" = "Mediator", "F4" = "Outcome"))
 #' }
 coef_table_mplus <- function(model, label_replace = NULL, params = c('regression'),
-                              bayes = NULL, addci = FALSE, sig_threshold = 0.05,
+                              bayes = NULL, display_type = NULL, sig_threshold = 0.05,
                               digits = 3, na_replace = NULL) {
 
-  # Resolve effective_bayes for column-structure decisions here (silent);
-  # conflict warnings are handled inside coef_wrapper when it receives the
-  # user's original bayes value.
+  # Resolve effective_bayes (silent); conflict warnings handled in coef_wrapper.
   effective_bayes <- if (is.null(bayes)) detect_mplus_bayes(model) else bayes
 
-  fetch_ci <- effective_bayes || addci
+  effective_display <- if (is.null(display_type)) {
+    if (effective_bayes) "est_ci" else "est_se"
+  } else {
+    display_type
+  }
+
+  fetch_ci <- effective_display == "est_ci"
 
   coefs <- coef_wrapper(model, label_replace = label_replace, params = params,
                         bayes = bayes, addci = fetch_ci) |>
@@ -139,7 +149,7 @@ coef_table_mplus <- function(model, label_replace = NULL, params = c('regression
   dvs <- unique(coefs$DV)
   fmt <- function(x) format(round(x, digits), nsmall = digits)
 
-  if (effective_bayes) {
+  if (effective_display == "est_ci") {
     long <- coefs |>
       mutate(
         sig     = !(LowerCI <= 0 & UpperCI >= 0),
@@ -151,7 +161,11 @@ coef_table_mplus <- function(model, label_replace = NULL, params = c('regression
 
     value_cols <- c("est_col", "ll_col", "ul_col")
     sub_labels <- c("Est.", "LL", "UL")
-    footnote   <- "* 95% credibility interval excludes zero. P-values are one-tailed."
+    footnote   <- if (effective_bayes) {
+      "* 95% credibility interval excludes zero."
+    } else {
+      "* 95% confidence interval excludes zero."
+    }
 
   } else {
     long <- coefs |>
@@ -159,20 +173,16 @@ coef_table_mplus <- function(model, label_replace = NULL, params = c('regression
         sig     = !is.na(pval) & pval < sig_threshold,
         est_col = paste0(fmt(est), if_else(sig, "*", "")),
         se_col  = fmt(se)
-      )
+      ) |>
+      select(IV, DV, est_col, se_col)
 
-    if (addci) {
-      long <- long |>
-        mutate(ll_col = fmt(LowerCI), ul_col = fmt(UpperCI)) |>
-        select(IV, DV, est_col, se_col, ll_col, ul_col)
-      value_cols <- c("est_col", "se_col", "ll_col", "ul_col")
-      sub_labels <- c("Est.", "SE", "LL", "UL")
+    value_cols <- c("est_col", "se_col")
+    sub_labels <- c("Est.", "SE")
+    footnote   <- if (effective_bayes) {
+      paste0("* p < ", sig_threshold, ", one-tailed.")
     } else {
-      long <- long |> select(IV, DV, est_col, se_col)
-      value_cols <- c("est_col", "se_col")
-      sub_labels <- c("Est.", "SE")
+      paste0("* p < ", sig_threshold)
     }
-    footnote <- paste0("* p < ", sig_threshold)
   }
 
   # Pivot to wide with column names {value}__{DV}

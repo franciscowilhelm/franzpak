@@ -196,15 +196,26 @@ test_that("coef_table_mplus auto-detects ML and produces Est./SE table", {
   expect_true(grepl("0\\.790\\*", d$est_col__F3[d$IV == "F2"]))
 })
 
-test_that("coef_table_mplus ML with addci adds LL and UL columns", {
+test_that("coef_table_mplus ML with display_type est_ci adds LL/UL and drops SE", {
   skip_if_not_installed("MplusAutomation")
 
   m <- MplusAutomation::readModels(find_extdata("ex5.11.out"), quiet = TRUE)
-  d <- table_data(coef_table_mplus(m, addci = TRUE))
+  d <- table_data(coef_table_mplus(m, display_type = "est_ci"))
 
   expect_true(all(c("ll_col__F4", "ul_col__F4", "ll_col__F3", "ul_col__F3") %in% names(d)))
+  expect_false(any(grepl("^se_col", names(d))))
   expect_equal(as.numeric(d$ll_col__F4[d$IV == "F3"]), 0.361, tolerance = 1e-3)
   expect_equal(as.numeric(d$ul_col__F4[d$IV == "F3"]), 0.585, tolerance = 1e-3)
+})
+
+test_that("coef_table_mplus Bayes with display_type est_se uses SE columns, no CrI", {
+  skip_if_not_installed("MplusAutomation")
+
+  m <- MplusAutomation::readModels(find_extdata("ex5.11_BAYES.out"), quiet = TRUE)
+  d <- suppressMessages(table_data(coef_table_mplus(m, display_type = "est_se")))
+
+  expect_true(all(c("est_col__F4", "se_col__F4", "est_col__F3", "se_col__F3") %in% names(d)))
+  expect_false(any(grepl("^ll_col|^ul_col", names(d))))
 })
 
 # --- coef_table_mplus: Bayes (auto-detected) ---
