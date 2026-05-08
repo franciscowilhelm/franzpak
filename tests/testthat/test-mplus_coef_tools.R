@@ -102,6 +102,20 @@ test_that("coef_wrapper no warning when bayes = TRUE on a Bayes model", {
   )
 })
 
+# --- coef_wrapper: type argument ---
+
+test_that("coef_wrapper type = stdyx returns different estimates than un", {
+  skip_if_not_installed("MplusAutomation")
+
+  m      <- MplusAutomation::readModels(find_extdata("ex5.11.out"), quiet = TRUE)
+  un     <- coef_wrapper(m)
+  stdyx  <- coef_wrapper(m, type = "stdyx")
+
+  expect_false(isTRUE(all.equal(un$est, stdyx$est)))
+  expect_equal(nrow(stdyx), 3)
+  expect_true(all(c("DV", "IV", "est", "se", "pval") %in% names(stdyx)))
+})
+
 # --- coef_wrapper: ML coefficients ---
 
 test_that("coef_wrapper returns regression coefficients with DV/IV columns for ex5.11", {

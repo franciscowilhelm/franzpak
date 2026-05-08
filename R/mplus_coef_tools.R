@@ -35,6 +35,9 @@ detect_mplus_bayes <- function(model) {
 #' @param model the Mplus model from MplusAutomation.
 #' @param label_replace named character vector for replacing parameter labels
 #' @param params which types of parameters to extract, see MplusAutomation
+#' @param type coefficient scale passed to [MplusAutomation::coef()] and
+#'   [MplusAutomation::confint()]. Common values: `"un"` (default, unstandardized),
+#'   `"stdyx"`, `"stdy"`, `"std"`.
 #' @param bayes `NULL` (default) to auto-detect from the model estimator; `TRUE`
 #'   to signal a Bayesian model (enables CrI-based significance in
 #'   [coef_table_mplus()]); `FALSE` to force frequentist display. A warning is
@@ -48,11 +51,13 @@ detect_mplus_bayes <- function(model) {
 #'
 #' @examples
 #' \dontrun{
-#' # get coefficients including confidence intervals
+#' # unstandardized coefficients with CIs
 #' mplusmodels <- MplusAutomation::readModels("inst/extdata")
 #' coef_wrapper(mplusmodels$ex5.11.out, params = c('regression', 'new'), addci = TRUE)
+#' # fully standardized
+#' coef_wrapper(mplusmodels$ex5.11.out, type = "stdyx")
 #' }
-coef_wrapper <- function(model, label_replace = NULL, params = c('regression'), bayes = NULL, addci = FALSE) {
+coef_wrapper <- function(model, label_replace = NULL, params = c('regression'), type = "un", bayes = NULL, addci = FALSE) {
   detected_bayes <- detect_mplus_bayes(model)
 
   if (detected_bayes) {
@@ -72,10 +77,10 @@ coef_wrapper <- function(model, label_replace = NULL, params = c('regression'), 
     )
   }
 
-  testcoefs <- coef(model, params = params)
+  testcoefs <- coef(model, params = params, type = type)
 
   if (addci) {
-    testcoefs <- left_join(testcoefs, confint(model, params), by = "Label")
+    testcoefs <- left_join(testcoefs, confint(model, params = params, type = type), by = "Label")
   }
 
   testcoefs <- sep_label_mplus(testcoefs)
@@ -109,6 +114,7 @@ coef_wrapper <- function(model, label_replace = NULL, params = c('regression'), 
 #'   Warnings from conflicting explicit values are issued by [coef_wrapper()].
 #' @param display_type `NULL` (default, auto-detect), `"est_se"` (estimate + SE,
 #'   p-value stars), or `"est_ci"` (estimate + CI LL/UL, interval-exclusion stars).
+#' @param type coefficient scale passed through to [coef_wrapper()]. Default `"un"`.
 #' @param sig_threshold P-value threshold for significance stars (`"est_se"` only, default 0.05).
 #' @param digits Number of decimal places (default 3).
 #' @param na_replace Character string to substitute for empty cells (predictors that
@@ -127,8 +133,8 @@ coef_wrapper <- function(model, label_replace = NULL, params = c('regression'), 
 #' coef_table_mplus(m, label_replace = c("F3" = "Mediator", "F4" = "Outcome"))
 #' }
 coef_table_mplus <- function(model, label_replace = NULL, params = c('regression'),
-                              bayes = NULL, display_type = NULL, sig_threshold = 0.05,
-                              digits = 3, na_replace = NULL) {
+                              bayes = NULL, display_type = NULL, type = "un",
+                              sig_threshold = 0.05, digits = 3, na_replace = NULL) {
 
   # Resolve effective_bayes (silent); conflict warnings handled in coef_wrapper.
   effective_bayes <- if (is.null(bayes)) detect_mplus_bayes(model) else bayes
@@ -142,7 +148,7 @@ coef_table_mplus <- function(model, label_replace = NULL, params = c('regression
   fetch_ci <- effective_display == "est_ci"
 
   coefs <- coef_wrapper(model, label_replace = label_replace, params = params,
-                        bayes = bayes, addci = fetch_ci) |>
+                        type = type, bayes = bayes, addci = fetch_ci) |>
     filter(!is.na(DV)) |>
     mutate(DV = trimws(DV), IV = trimws(IV))
 
