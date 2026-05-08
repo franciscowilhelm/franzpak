@@ -36,9 +36,11 @@ detect_mplus_bayes <- function(model) {
 #' @param label_replace named character vector for replacing parameter labels
 #' @param params which types of parameters to extract, see MplusAutomation
 #' @param bayes `NULL` (default) to auto-detect from the model estimator; `TRUE`
-#'   to force Bayesian display (p-values doubled, CrI-based significance);
-#'   `FALSE` to force frequentist display. A warning is issued when the explicit
-#'   value conflicts with the detected estimator.
+#'   to signal a Bayesian model (enables CrI-based significance in
+#'   [coef_table_mplus()]); `FALSE` to force frequentist display. A warning is
+#'   issued when the explicit value conflicts with the detected estimator. When
+#'   a Bayesian model is detected, a message notes that Mplus p-values are
+#'   one-tailed.
 #' @param addci Add confidence intervals to parameters
 #'
 #' @return a dataframe with mplus model coefficients
@@ -53,12 +55,15 @@ detect_mplus_bayes <- function(model) {
 coef_wrapper <- function(model, label_replace = NULL, params = c('regression'), bayes = NULL, addci = FALSE) {
   detected_bayes <- detect_mplus_bayes(model)
 
+  if (detected_bayes) {
+    message("Bayesian estimator detected: p-values in this output are one-tailed.")
+  }
+
   if (is.null(bayes)) {
     bayes <- detected_bayes
   } else if (isTRUE(bayes) && !detected_bayes) {
     warning(
-      "bayes = TRUE was specified but the model estimator does not appear to be BAYES. ",
-      "Proceeding with Bayesian p-value adjustment (p-values doubled)."
+      "bayes = TRUE was specified but the model estimator does not appear to be BAYES."
     )
   } else if (isFALSE(bayes) && detected_bayes) {
     warning(
@@ -68,10 +73,6 @@ coef_wrapper <- function(model, label_replace = NULL, params = c('regression'), 
   }
 
   testcoefs <- coef(model, params = params)
-
-  if (bayes) {
-    testcoefs <- testcoefs |> mutate(pval = pval * 2)
-  }
 
   if (addci) {
     testcoefs <- left_join(testcoefs, confint(model, params), by = "Label")
@@ -150,7 +151,7 @@ coef_table_mplus <- function(model, label_replace = NULL, params = c('regression
 
     value_cols <- c("est_col", "ll_col", "ul_col")
     sub_labels <- c("Est.", "LL", "UL")
-    footnote   <- "* 95% credibility interval excludes zero"
+    footnote   <- "* 95% credibility interval excludes zero. P-values are one-tailed."
 
   } else {
     long <- coefs |>

@@ -58,18 +58,20 @@ test_that("sep_label_mplus preserves est, se, and pval columns unchanged", {
 
 # --- coef_wrapper: auto-detection and conflict warnings ---
 
-test_that("coef_wrapper auto-detects ML estimator without warning", {
+test_that("coef_wrapper auto-detects ML estimator without warning or message", {
   skip_if_not_installed("MplusAutomation")
 
   m <- MplusAutomation::readModels(find_extdata("ex5.11.out"), quiet = TRUE)
-  expect_no_warning(coef_wrapper(m))
+  expect_no_warning(expect_no_message(coef_wrapper(m)))
 })
 
-test_that("coef_wrapper auto-detects BAYES estimator without warning", {
+test_that("coef_wrapper auto-detects BAYES and emits one-tailed message, no warning", {
   skip_if_not_installed("MplusAutomation")
 
   m <- MplusAutomation::readModels(find_extdata("ex5.11_BAYES.out"), quiet = TRUE)
-  expect_no_warning(coef_wrapper(m))
+  expect_no_warning(
+    expect_message(coef_wrapper(m), regexp = "one-tailed")
+  )
 })
 
 test_that("coef_wrapper warns when bayes = TRUE on an ML model", {
@@ -86,9 +88,8 @@ test_that("coef_wrapper warns when bayes = FALSE on a Bayes model", {
   skip_if_not_installed("MplusAutomation")
 
   m <- MplusAutomation::readModels(find_extdata("ex5.11_BAYES.out"), quiet = TRUE)
-  expect_warning(
-    coef_wrapper(m, bayes = FALSE),
-    regexp = "estimated with BAYES"
+  suppressMessages(
+    expect_warning(coef_wrapper(m, bayes = FALSE), regexp = "estimated with BAYES")
   )
 })
 
@@ -96,7 +97,9 @@ test_that("coef_wrapper no warning when bayes = TRUE on a Bayes model", {
   skip_if_not_installed("MplusAutomation")
 
   m <- MplusAutomation::readModels(find_extdata("ex5.11_BAYES.out"), quiet = TRUE)
-  expect_no_warning(coef_wrapper(m, bayes = TRUE))
+  suppressMessages(
+    expect_no_warning(coef_wrapper(m, bayes = TRUE))
+  )
 })
 
 # --- coef_wrapper: ML coefficients ---
@@ -139,14 +142,14 @@ test_that("coef_wrapper label_replace renames DV and IV labels", {
   expect_false(any(grepl("F3|F4", result$DV), na.rm = TRUE))
 })
 
-test_that("coef_wrapper with bayes = TRUE doubles all p-values", {
+test_that("coef_wrapper does not modify p-values regardless of bayes setting", {
   skip_if_not_installed("MplusAutomation")
 
   m <- MplusAutomation::readModels(find_extdata("ex5.11.out"), quiet = TRUE)
-  result_normal <- coef_wrapper(m)
-  result_bayes  <- suppressWarnings(coef_wrapper(m, bayes = TRUE))
+  result_default <- coef_wrapper(m)
+  result_bayes   <- suppressWarnings(coef_wrapper(m, bayes = TRUE))
 
-  expect_equal(result_bayes$pval, result_normal$pval * 2, tolerance = 1e-10)
+  expect_equal(result_bayes$pval, result_default$pval, tolerance = 1e-10)
 })
 
 # --- coef_wrapper: Bayes coefficients (auto-detected) ---
@@ -155,19 +158,21 @@ test_that("coef_wrapper auto-detects BAYES and returns correct estimates", {
   skip_if_not_installed("MplusAutomation")
 
   m <- MplusAutomation::readModels(find_extdata("ex5.11_BAYES.out"), quiet = TRUE)
-  result <- coef_wrapper(m)  # bayes auto-detected
+  result <- suppressMessages(coef_wrapper(m))
 
   expect_equal(nrow(result), 3)
   expect_equal(trimws(result$DV), c("F4", "F3", "F3"))
   expect_equal(trimws(result$IV), c("F3", "F1", "F2"))
   expect_equal(result$est, c(0.466, 0.560, 0.799), tolerance = 1e-3)
+  # p-values kept as-is (one-tailed, not doubled)
+  expect_equal(result$pval, c(0, 0, 0))
 })
 
 test_that("coef_wrapper Bayes with addci returns credibility intervals", {
   skip_if_not_installed("MplusAutomation")
 
   m <- MplusAutomation::readModels(find_extdata("ex5.11_BAYES.out"), quiet = TRUE)
-  result <- coef_wrapper(m, addci = TRUE)
+  result <- suppressMessages(coef_wrapper(m, addci = TRUE))
 
   expect_true(all(c("LowerCI", "UpperCI") %in% names(result)))
   expect_equal(result$LowerCI, c(0.353, 0.428, 0.635), tolerance = 1e-3)
