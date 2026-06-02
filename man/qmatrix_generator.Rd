@@ -46,7 +46,7 @@ when \code{responses = TRUE}).}
 \item{build_text}{Logical; if \code{TRUE}, assemble Qualtrics-ready text blocks.}
 
 \item{clean_text}{A function applied to each item text vector when
-\code{build_text = TRUE} (defaults to \link[stringr:str_trim]{stringr::str_squish}). Set to \code{NULL} to
+\code{build_text = TRUE} (defaults to \link[stringr:str_squish]{stringr::str_squish}). Set to \code{NULL} to
 skip cleaning.}
 
 \item{keep_order}{Logical; if \code{TRUE}, preserve the first-appearance order of

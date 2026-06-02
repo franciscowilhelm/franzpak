@@ -1,0 +1,266 @@
+---
+title: "Formatting Mplus Coefficients with franzpak"
+format:
+  html:
+    toc: true
+    df-print: paged
+execute:
+  warning: false
+  message: false
+---
+
+# Introduction
+
+This vignette demonstrates the Mplus coefficient tools in `franzpak`:
+
+- `coef_wrapper()` -- pulls coefficients from an
+  [`MplusAutomation`](https://cran.r-project.org/package=MplusAutomation)
+  model and splits the Mplus parameter labels into dependent (`DV`) and
+  independent (`IV`) variable columns.
+- `coef_table_mplus()` -- arranges those coefficients into a publication-ready,
+  predictor x outcome table (rendered with [`gt`](https://gt.rstudio.com) when
+  available).
+
+Both functions:
+
+- auto-detect Bayesian vs. frequentist estimation and adapt the display
+  (estimate + SE with *p*-value stars, or estimate + 95% interval with
+  interval-exclusion stars);
+- understand **two-level (multilevel) models**, splitting effects into
+  **Within** and **Between** sections and reporting the means/intercepts of
+  random slopes as the *between-person means of within-person effects*.
+
+The examples use the classic Mplus User's Guide data files that ship with
+`franzpak` in `inst/extdata/`.
+
+```{r setup}
+library(franzpak)
+library(MplusAutomation)
+
+# Locate a bundled .out file whether the package is installed or loaded from
+# the source tree (e.g. via devtools::load_all()).
+mplus_file <- function(name) {
+  p <- system.file("extdata", name, package = "franzpak")
+  if (nzchar(p)) return(p)
+  cands <- c(file.path("inst", "extdata", name),
+             file.path("..", "extdata", name),
+             file.path("..", "..", "inst", "extdata", name))
+  hit <- cands[file.exists(cands)]
+  if (length(hit) == 0) stop("Could not locate ", name)
+  hit[[1]]
+}
+```
+
+# Part 1: A single-level model
+
+`ex5.11` is a single-level structural equation model: two exogenous factors
+(`F1`, `F2`) predict a mediator factor (`F3`), which in turn predicts an
+outcome factor (`F4`).
+
+```{r read-ex511}
+m_sem <- readModels(mplus_file("ex5.11.out"), quiet = TRUE)
+```
+
+## `coef_wrapper()`: tidy coefficients
+
+By default `coef_wrapper()` returns the unstandardized regression parameters
+with the Mplus `DV<-IV` label split into separate columns.
+
+```{r cw-basic}
+coef_wrapper(m_sem)
+```
+
+Add confidence intervals with `addci = TRUE` (these come from the Mplus
+CINTERVAL output):
+
+```{r cw-ci}
+coef_wrapper(m_sem, addci = TRUE)
+```
+
+Request a different coefficient scale with `type` -- e.g. fully standardized
+(`STDYX`) estimates:
+
+```{r cw-stdyx}
+coef_wrapper(m_sem, type = "stdyx")
+```
+
+## `coef_table_mplus()`: a publication table
+
+`coef_table_mplus()` reshapes the coefficients into a predictor x outcome
+table. For a frequentist model the default display is estimate + standard error
+with stars for *p* < 0.05.
+
+```{r ct-est-se}
+coef_table_mplus(m_sem)
+```
+
+Switch to an estimate + confidence-interval display with
+`display_type = "est_ci"`; stars now mark intervals that exclude zero:
+
+```{r ct-est-ci}
+coef_table_mplus(m_sem, display_type = "est_ci")
+```
+
+Rename the cryptic Mplus factor labels with `label_replace`, and fill empty
+cells with `na_replace`:
+
+```{r ct-labels}
+coef_table_mplus(
+  m_sem,
+  label_replace = c("F1" = "Predictor 1", "F2" = "Predictor 2",
+                    "F3" = "Mediator",    "F4" = "Outcome"),
+  na_replace    = "-"
+)
+```
+
+## Bayesian estimation is detected automatically
+
+`ex5.11_BAYES` is the same model estimated with `ESTIMATOR = BAYES`. The tools
+detect this, switch the default display to estimate + 95% **credibility**
+interval, and emit a message reminding you that Mplus Bayesian *p*-values are
+one-tailed.
+
+```{r ct-bayes, message=TRUE}
+m_sem_bayes <- readModels(mplus_file("ex5.11_BAYES.out"), quiet = TRUE)
+coef_table_mplus(m_sem_bayes)
+```
+
+You can always override the auto-detection with the `bayes` and `display_type`
+arguments.
+
+# Part 2: A two-level model with a random slope
+
+`ex9.2c` is a two-level regression (Mplus User's Guide example 9.2c). The model
+is:
+
+```default
+%WITHIN%
+  s | y ON x;        ! random slope of y on x (a within-person effect)
+%BETWEEN%
+  y s ON w x;        ! between-level regressions of y and of the slope s
+  y WITH s;
+```
+
+The key feature is the **random slope** `s | y ON x`: the effect of `x` on `y`
+*within* clusters is allowed to vary *between* clusters. Its intercept is the
+average within-person slope -- a between-person summary of a within-person
+effect.
+
+```{r read-ex92c}
+m_ml <- readModels(mplus_file("ex9.2c.out"), quiet = TRUE)
+```
+
+## `coef_wrapper()` annotates the multilevel structure
+
+For two-level models `coef_wrapper()` adds several annotation columns. Here we
+request `regression`, `expectation` and `variability` parameters so that
+intercepts/means and the random-slope variance are all included:
+
+```{r cw-ml}
+coef_wrapper(m_ml, params = c("regression", "expectation", "variability"))
+```
+
+- **`level`** -- the Mplus section the parameter belongs to (`Within` /
+  `Between`).
+- **`random_slope`** -- `TRUE` for any parameter that pertains to the random
+  slope `S` (its mean, its predictors, or its variance).
+- **`within_avg_effect`** -- `TRUE` for the mean/intercept of a random slope,
+  i.e. a between-person mean of a within-person effect.
+- **`random_effect`** -- `TRUE` for the slope's *other* parameters: its
+  cross-level predictors and its (residual) variance.
+- **`variance`** -- `TRUE` for (residual) variance parameters.
+- **`display_level`** -- the table section the row belongs to: `Within`,
+  `Between`, or `Random effects`.
+
+`coef_wrapper()` re-expresses each slope parameter in terms of the within-person
+relationship the slope captures (`s | y ON x`):
+
+- the **mean** of `S` (1.017) becomes the average within-person effect of `x` on
+  `y`, so it is reported with `DV = "Y"`, `IV = "X"` and `display_level = "Within"`;
+- the **cross-level regressions** `S ON W` and `S ON X` describe how the slope
+  varies across clusters; they move to `display_level = "Random effects"` and are
+  reported under the slope's outcome (`DV = "Y"`), keeping the between predictor;
+- the slope's **(residual) variance** also moves to `Random effects`, labelled
+  `IV = "Residual variance"`.
+
+Variances that do not belong to a random slope (here the residual variances of
+`Y`) are kept by `coef_wrapper()` but omitted from the table below.
+
+## `coef_table_mplus()` builds a three-section table
+
+The table now has up to three sections:
+
+- **Within** -- within-person effects. The within-person effect of `X` on `Y`
+  (the random-slope mean) appears as predictor `X` under outcome `Y`, marked with
+  a superscript letter (the APA convention for a *specific note*; the dagger is
+  avoided because APA reserves it for marginal significance).
+- **Between** -- between-person effects on the real outcome `Y`. Note that the
+  *between-person* effect of `X` on `Y` (1.024) is a separate, fixed coefficient,
+  kept clearly apart from its *within-person* counterpart (1.017) -- the classic
+  within/between decomposition.
+- **Random effects** -- the remaining parameters of the random slope `S`: its
+  between-level predictors `W` and `X` (cross-level interactions) and its
+  residual variance. These appear under the `Y` column instead of giving the
+  latent slope `S` its own outcome column.
+
+```{r ct-ml}
+coef_table_mplus(m_ml)
+```
+
+Use `label_replace` to give the outcomes and predictors more descriptive names
+(slope parameters follow their remapped predictor/outcome, so renaming `X` and
+`Y` is enough):
+
+```{r ct-ml-labels}
+coef_table_mplus(
+  m_ml,
+  label_replace = c("Y" = "Outcome Y", "X" = "Predictor X", "W" = "Cluster W")
+)
+```
+
+When the package is rendering to a plain tibble (no `gt` installed), the
+section is carried in a leading `level` column instead of a row group, so the
+section structure is never lost.
+
+## Two-level Bayesian model
+
+The Bayesian variant `ex9.2c_BAYES` defaults to a credibility-interval display.
+The random-slope mean is again remapped to its within predictor and placed in
+the Within section.
+
+```{r ct-ml-bayes, message=TRUE}
+m_ml_bayes <- readModels(mplus_file("ex9.2c_BAYES.out"), quiet = TRUE)
+coef_table_mplus(m_ml_bayes)
+```
+
+::: {.callout-note}
+## Intervals without a CINTERVAL table
+
+`coef_table_mplus()` (via an internal helper) first asks
+`MplusAutomation`'s `confint()` for intervals, which requires the Mplus
+`CINTERVAL` output. If that table is unavailable -- common for Bayesian runs
+where the credibility limits are printed inline in `MODEL RESULTS` -- the tools
+fall back to reconstructing the 95% interval from those inline columns, so
+`display_type = "est_ci"` keeps working. If no intervals can be found at all
+(e.g. a frequentist run without `CINTERVAL`), the table gracefully falls back to
+the estimate + SE display.
+:::
+
+# Argument quick reference
+
+| Argument | `coef_wrapper()` | `coef_table_mplus()` |
+|---|---|---|
+| `params` | parameter types to extract (default `"regression"`) | default `c("regression", "expectation")` for two-level, `"regression"` otherwise |
+| `type` | coefficient scale: `"un"`, `"stdyx"`, `"stdy"`, `"std"` | passed through to `coef_wrapper()` |
+| `bayes` | `NULL` auto-detect, or force `TRUE`/`FALSE` | same |
+| `display_type` | -- | `NULL` auto-detect, `"est_se"`, or `"est_ci"` |
+| `addci` | append `LowerCI`/`UpperCI` | (handled internally for `est_ci`) |
+| `label_replace` | rename DV/IV labels | rename DV/IV labels |
+| `na_replace` | -- | fill empty cells |
+| `sig_threshold`, `digits` | -- | star threshold / rounding |
+
+# Session info
+
+```{r session}
+sessionInfo()
+```

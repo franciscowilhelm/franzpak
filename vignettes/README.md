@@ -17,16 +17,30 @@ Comprehensive guide to using the background job management system (`bgjm_*` func
 - Error handling and troubleshooting
 - Best practices
 
-**To build the vignette:**
+### Mplus Coefficient Tools (`mplus-coef-tools.qmd`)
 
-Using Quarto:
+Guide to formatting Mplus coefficients with `coef_wrapper()` and
+`coef_table_mplus()`, using the bundled Mplus User's Guide example outputs.
+
+**Topics covered:**
+- Tidy coefficient extraction and DV/IV label splitting
+- Publication-ready predictor x outcome tables (via `gt`)
+- Standardized (`STDYX`) coefficients and confidence/credibility intervals
+- Automatic Bayesian vs. frequentist detection and display
+- Two-level models: Within/Between sections, with random-slope means/intercepts
+  reported as between-person means of within-person effects
+
+**To build the vignettes:**
+
+The Quarto sources live in `inst/quarto/`. Using Quarto:
 ```bash
-quarto render vignettes/background-jobs.qmd
+quarto render inst/quarto/background-jobs.qmd
+quarto render inst/quarto/mplus-coef-tools.qmd
 ```
 
 Or from R:
 ```r
-quarto::quarto_render("vignettes/background-jobs.qmd")
+quarto::quarto_render("inst/quarto/mplus-coef-tools.qmd")
 ```
 
-The HTML output will be created in the vignettes directory.
+The rendered HTML lives in this `vignettes/` directory.

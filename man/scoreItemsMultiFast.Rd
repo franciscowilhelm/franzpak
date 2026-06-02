@@ -18,7 +18,7 @@ scoreItemsMultiFast(
 \item{dataframe}{dataframe holding the items to be scored}
 
 \item{manual_keys}{Optional. A named list with manual keys for scales, formatted
-like in \code{\link[psych:score.items]{psych::scoreItems()}} or \code{\link[psych:score.items]{psych::scoreFast()}}. Items to be reversed
+like in \code{\link[psych:scoreItems]{psych::scoreItems()}} or \code{\link[psych:scoreFast]{psych::scoreFast()}}. Items to be reversed
 must be prefixed with "-". If provided, keys must be supplied for \emph{all}
 scales listed in \code{scalenames}. If \code{NULL} (the default), the function attempts
 to find items based on naming convention (items starting with \code{scalename} followed
@@ -28,7 +28,7 @@ by \code{.} or \verb{_}) and assumes \strong{no items are reverse-coded}.}
 more than 1/3 of a scale's items (as determined by the keys used) are NA.
 Defaults to TRUE.}
 
-\item{...}{additional arguments to be passed to \code{\link[psych:score.items]{psych::scoreFast()}}.}
+\item{...}{additional arguments to be passed to \code{\link[psych:scoreFast]{psych::scoreFast()}}.}
 }
 \value{
 a list object holding:
@@ -38,7 +38,7 @@ key list for that scale) were treated as reversed. This is based on
 the provided \code{manual_keys} if supplied, otherwise all are \code{FALSE}.}
 }
 \description{
-This is a convenience wrapper for \code{\link[psych:score.items]{psych::scoreFast()}} that allows automatically
+This is a convenience wrapper for \code{\link[psych:scoreFast]{psych::scoreFast()}} that allows automatically
 scoring multiple scales at once. It is designed for speed and for cases
 with few observations where PCA or reliability estimation might fail.
 Unlike \code{scoreItemsMulti}, this function does \emph{not} calculate Cronbach's alpha

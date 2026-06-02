@@ -7,10 +7,10 @@
 bgjm_poll(timeout_ms = 0)
 }
 \arguments{
-\item{timeout_ms}{Milliseconds to wait inside \code{\link[callr:reexports]{callr::poll()}}.}
+\item{timeout_ms}{Milliseconds to wait inside \code{\link[callr:poll]{callr::poll()}}.}
 }
 \value{
-Invisible poll result from \code{\link[callr:reexports]{callr::poll()}}.
+Invisible poll result from \code{\link[callr:poll]{callr::poll()}}.
 }
 \description{
 Poll background jobs

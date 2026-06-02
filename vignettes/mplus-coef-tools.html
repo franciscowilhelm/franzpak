@@ -1,0 +1,4538 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.6.43">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+
+<title>Formatting Mplus Coefficients with franzpak</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { display: inline-block; text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="mplus-coef-tools_files/libs/clipboard/clipboard.min.js"></script>
+<script src="mplus-coef-tools_files/libs/quarto-html/quarto.js"></script>
+<script src="mplus-coef-tools_files/libs/quarto-html/popper.min.js"></script>
+<script src="mplus-coef-tools_files/libs/quarto-html/tippy.umd.min.js"></script>
+<script src="mplus-coef-tools_files/libs/quarto-html/anchor.min.js"></script>
+<link href="mplus-coef-tools_files/libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="mplus-coef-tools_files/libs/quarto-html/quarto-syntax-highlighting-d4d76bf8491c20bad77d141916dc28e1.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="mplus-coef-tools_files/libs/bootstrap/bootstrap.min.js"></script>
+<link href="mplus-coef-tools_files/libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="mplus-coef-tools_files/libs/bootstrap/bootstrap-c0367b04c37547644fece4185067e4a7.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<link href="mplus-coef-tools_files/libs/pagedtable-1.1/css/pagedtable.css" rel="stylesheet">
+<script src="mplus-coef-tools_files/libs/pagedtable-1.1/js/pagedtable.js"></script>
+
+
+</head>
+
+<body>
+
+<div id="quarto-content" class="page-columns page-rows-contents page-layout-article">
+<div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+  <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">Table of contents</h2>
+   
+  <ul>
+  <li><a href="#introduction" id="toc-introduction" class="nav-link active" data-scroll-target="#introduction">Introduction</a></li>
+  <li><a href="#part-1-a-single-level-model" id="toc-part-1-a-single-level-model" class="nav-link" data-scroll-target="#part-1-a-single-level-model">Part 1: A single-level model</a>
+  <ul class="collapse">
+  <li><a href="#coef_wrapper-tidy-coefficients" id="toc-coef_wrapper-tidy-coefficients" class="nav-link" data-scroll-target="#coef_wrapper-tidy-coefficients"><code>coef_wrapper()</code>: tidy coefficients</a></li>
+  <li><a href="#coef_table_mplus-a-publication-table" id="toc-coef_table_mplus-a-publication-table" class="nav-link" data-scroll-target="#coef_table_mplus-a-publication-table"><code>coef_table_mplus()</code>: a publication table</a></li>
+  <li><a href="#bayesian-estimation-is-detected-automatically" id="toc-bayesian-estimation-is-detected-automatically" class="nav-link" data-scroll-target="#bayesian-estimation-is-detected-automatically">Bayesian estimation is detected automatically</a></li>
+  </ul></li>
+  <li><a href="#part-2-a-two-level-model-with-a-random-slope" id="toc-part-2-a-two-level-model-with-a-random-slope" class="nav-link" data-scroll-target="#part-2-a-two-level-model-with-a-random-slope">Part 2: A two-level model with a random slope</a>
+  <ul class="collapse">
+  <li><a href="#coef_wrapper-annotates-the-multilevel-structure" id="toc-coef_wrapper-annotates-the-multilevel-structure" class="nav-link" data-scroll-target="#coef_wrapper-annotates-the-multilevel-structure"><code>coef_wrapper()</code> annotates the multilevel structure</a></li>
+  <li><a href="#coef_table_mplus-builds-a-three-section-table" id="toc-coef_table_mplus-builds-a-three-section-table" class="nav-link" data-scroll-target="#coef_table_mplus-builds-a-three-section-table"><code>coef_table_mplus()</code> builds a three-section table</a></li>
+  <li><a href="#two-level-bayesian-model" id="toc-two-level-bayesian-model" class="nav-link" data-scroll-target="#two-level-bayesian-model">Two-level Bayesian model</a></li>
+  </ul></li>
+  <li><a href="#argument-quick-reference" id="toc-argument-quick-reference" class="nav-link" data-scroll-target="#argument-quick-reference">Argument quick reference</a></li>
+  <li><a href="#session-info" id="toc-session-info" class="nav-link" data-scroll-target="#session-info">Session info</a></li>
+  </ul>
+</nav>
+</div>
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">Formatting Mplus Coefficients with franzpak</h1>
+</div>
+
+
+
+<div class="quarto-title-meta">
+
+    
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<section id="introduction" class="level1">
+<h1>Introduction</h1>
+<p>This vignette demonstrates the Mplus coefficient tools in <code>franzpak</code>:</p>
+<ul>
+<li><code>coef_wrapper()</code> – pulls coefficients from an <a href="https://cran.r-project.org/package=MplusAutomation"><code>MplusAutomation</code></a> model and splits the Mplus parameter labels into dependent (<code>DV</code>) and independent (<code>IV</code>) variable columns.</li>
+<li><code>coef_table_mplus()</code> – arranges those coefficients into a publication-ready, predictor x outcome table (rendered with <a href="https://gt.rstudio.com"><code>gt</code></a> when available).</li>
+</ul>
+<p>Both functions:</p>
+<ul>
+<li>auto-detect Bayesian vs.&nbsp;frequentist estimation and adapt the display (estimate + SE with <em>p</em>-value stars, or estimate + 95% interval with interval-exclusion stars);</li>
+<li>understand <strong>two-level (multilevel) models</strong>, splitting effects into <strong>Within</strong> and <strong>Between</strong> sections and reporting the means/intercepts of random slopes as the <em>between-person means of within-person effects</em>.</li>
+</ul>
+<p>The examples use the classic Mplus User’s Guide data files that ship with <code>franzpak</code> in <code>inst/extdata/</code>.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb1"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(franzpak)</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(MplusAutomation)</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="co"># Locate a bundled .out file whether the package is installed or loaded from</span></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="co"># the source tree (e.g. via devtools::load_all()).</span></span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a>mplus_file <span class="ot">&lt;-</span> <span class="cf">function</span>(name) {</span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>  p <span class="ot">&lt;-</span> <span class="fu">system.file</span>(<span class="st">"extdata"</span>, name, <span class="at">package =</span> <span class="st">"franzpak"</span>)</span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> (<span class="fu">nzchar</span>(p)) <span class="fu">return</span>(p)</span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a>  cands <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="fu">file.path</span>(<span class="st">"inst"</span>, <span class="st">"extdata"</span>, name),</span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a>             <span class="fu">file.path</span>(<span class="st">".."</span>, <span class="st">"extdata"</span>, name),</span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a>             <span class="fu">file.path</span>(<span class="st">".."</span>, <span class="st">".."</span>, <span class="st">"inst"</span>, <span class="st">"extdata"</span>, name))</span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a>  hit <span class="ot">&lt;-</span> cands[<span class="fu">file.exists</span>(cands)]</span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> (<span class="fu">length</span>(hit) <span class="sc">==</span> <span class="dv">0</span>) <span class="fu">stop</span>(<span class="st">"Could not locate "</span>, name)</span>
+<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a>  hit[[<span class="dv">1</span>]]</span>
+<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a>}</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</section>
+<section id="part-1-a-single-level-model" class="level1">
+<h1>Part 1: A single-level model</h1>
+<p><code>ex5.11</code> is a single-level structural equation model: two exogenous factors (<code>F1</code>, <code>F2</code>) predict a mediator factor (<code>F3</code>), which in turn predicts an outcome factor (<code>F4</code>).</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb2"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>m_sem <span class="ot">&lt;-</span> <span class="fu">readModels</span>(<span class="fu">mplus_file</span>(<span class="st">"ex5.11.out"</span>), <span class="at">quiet =</span> <span class="cn">TRUE</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<section id="coef_wrapper-tidy-coefficients" class="level2">
+<h2 class="anchored" data-anchor-id="coef_wrapper-tidy-coefficients"><code>coef_wrapper()</code>: tidy coefficients</h2>
+<p>By default <code>coef_wrapper()</code> returns the unstandardized regression parameters with the Mplus <code>DV&lt;-IV</code> label split into separate columns.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb3"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="fu">coef_wrapper</span>(m_sem)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div data-pagedtable="false">
+  <script data-pagedtable-source="" type="application/json">
+{"columns":[{"label":["Label"],"name":[1],"type":["chr"],"align":["left"]},{"label":["est"],"name":[2],"type":["dbl"],"align":["right"]},{"label":["se"],"name":[3],"type":["dbl"],"align":["right"]},{"label":["pval"],"name":[4],"type":["dbl"],"align":["right"]},{"label":["DV"],"name":[5],"type":["chr"],"align":["left"]},{"label":["IV"],"name":[6],"type":["chr"],"align":["left"]}],"data":[{"1":"F4<-F3","2":"0.473","3":"0.057","4":"0","5":"F4","6":"F3"},{"1":"F3<-F1","2":"0.563","3":"0.070","4":"0","5":"F3","6":"F1"},{"1":"F3<-F2","2":"0.790","3":"0.086","4":"0","5":"F3","6":"F2"}],"options":{"columns":{"min":{},"max":[10]},"rows":{"min":[10],"max":[10]},"pages":{}}}
+  </script>
+</div>
+</div>
+</div>
+<p>Add confidence intervals with <code>addci = TRUE</code> (these come from the Mplus CINTERVAL output):</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb4"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="fu">coef_wrapper</span>(m_sem, <span class="at">addci =</span> <span class="cn">TRUE</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div data-pagedtable="false">
+  <script data-pagedtable-source="" type="application/json">
+{"columns":[{"label":["Label"],"name":[1],"type":["chr"],"align":["left"]},{"label":["est"],"name":[2],"type":["dbl"],"align":["right"]},{"label":["se"],"name":[3],"type":["dbl"],"align":["right"]},{"label":["pval"],"name":[4],"type":["dbl"],"align":["right"]},{"label":["LowerCI"],"name":[5],"type":["dbl"],"align":["right"]},{"label":["UpperCI"],"name":[6],"type":["dbl"],"align":["right"]},{"label":["DV"],"name":[7],"type":["chr"],"align":["left"]},{"label":["IV"],"name":[8],"type":["chr"],"align":["left"]}],"data":[{"1":"F4<-F3","2":"0.473","3":"0.057","4":"0","5":"0.361","6":"0.585","7":"F4","8":"F3"},{"1":"F3<-F1","2":"0.563","3":"0.070","4":"0","5":"0.425","6":"0.700","7":"F3","8":"F1"},{"1":"F3<-F2","2":"0.790","3":"0.086","4":"0","5":"0.622","6":"0.958","7":"F3","8":"F2"}],"options":{"columns":{"min":{},"max":[10]},"rows":{"min":[10],"max":[10]},"pages":{}}}
+  </script>
+</div>
+</div>
+</div>
+<p>Request a different coefficient scale with <code>type</code> – e.g.&nbsp;fully standardized (<code>STDYX</code>) estimates:</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb5"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="fu">coef_wrapper</span>(m_sem, <span class="at">type =</span> <span class="st">"stdyx"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div data-pagedtable="false">
+  <script data-pagedtable-source="" type="application/json">
+{"columns":[{"label":["Label"],"name":[1],"type":["chr"],"align":["left"]},{"label":["est"],"name":[2],"type":["dbl"],"align":["right"]},{"label":["se"],"name":[3],"type":["dbl"],"align":["right"]},{"label":["pval"],"name":[4],"type":["dbl"],"align":["right"]},{"label":["DV"],"name":[5],"type":["chr"],"align":["left"]},{"label":["IV"],"name":[6],"type":["chr"],"align":["left"]}],"data":[{"1":"F4<-F3","2":"0.595","3":"0.049","4":"0","5":"F4","6":"F3"},{"1":"F3<-F1","2":"0.454","3":"0.048","4":"0","5":"F3","6":"F1"},{"1":"F3<-F2","2":"0.639","3":"0.044","4":"0","5":"F3","6":"F2"}],"options":{"columns":{"min":{},"max":[10]},"rows":{"min":[10],"max":[10]},"pages":{}}}
+  </script>
+</div>
+</div>
+</div>
+</section>
+<section id="coef_table_mplus-a-publication-table" class="level2">
+<h2 class="anchored" data-anchor-id="coef_table_mplus-a-publication-table"><code>coef_table_mplus()</code>: a publication table</h2>
+<p><code>coef_table_mplus()</code> reshapes the coefficients into a predictor x outcome table. For a frequentist model the default display is estimate + standard error with stars for <em>p</em> &lt; 0.05.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb6"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="fu">coef_table_mplus</span>(m_sem)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div id="zpriucazsi" style="padding-left:0px;padding-right:0px;padding-top:10px;padding-bottom:10px;overflow-x:auto;overflow-y:auto;width:auto;height:auto;">
+<style>#zpriucazsi table {
+  font-family: system-ui, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#zpriucazsi thead, #zpriucazsi tbody, #zpriucazsi tfoot, #zpriucazsi tr, #zpriucazsi td, #zpriucazsi th {
+  border-style: none;
+}
+
+#zpriucazsi p {
+  margin: 0;
+  padding: 0;
+}
+
+#zpriucazsi .gt_table {
+  display: table;
+  border-collapse: collapse;
+  line-height: normal;
+  margin-left: auto;
+  margin-right: auto;
+  color: #333333;
+  font-size: 16px;
+  font-weight: normal;
+  font-style: normal;
+  background-color: #FFFFFF;
+  width: auto;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #A8A8A8;
+  border-right-style: none;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #A8A8A8;
+  border-left-style: none;
+  border-left-width: 2px;
+  border-left-color: #D3D3D3;
+}
+
+#zpriucazsi .gt_caption {
+  padding-top: 4px;
+  padding-bottom: 4px;
+}
+
+#zpriucazsi .gt_title {
+  color: #333333;
+  font-size: 125%;
+  font-weight: initial;
+  padding-top: 4px;
+  padding-bottom: 4px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-bottom-color: #FFFFFF;
+  border-bottom-width: 0;
+}
+
+#zpriucazsi .gt_subtitle {
+  color: #333333;
+  font-size: 85%;
+  font-weight: initial;
+  padding-top: 3px;
+  padding-bottom: 5px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-top-color: #FFFFFF;
+  border-top-width: 0;
+}
+
+#zpriucazsi .gt_heading {
+  background-color: #FFFFFF;
+  text-align: center;
+  border-bottom-color: #FFFFFF;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+}
+
+#zpriucazsi .gt_bottom_border {
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+}
+
+#zpriucazsi .gt_col_headings {
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+}
+
+#zpriucazsi .gt_col_heading {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: normal;
+  text-transform: inherit;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+  vertical-align: bottom;
+  padding-top: 5px;
+  padding-bottom: 6px;
+  padding-left: 5px;
+  padding-right: 5px;
+  overflow-x: hidden;
+}
+
+#zpriucazsi .gt_column_spanner_outer {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: normal;
+  text-transform: inherit;
+  padding-top: 0;
+  padding-bottom: 0;
+  padding-left: 4px;
+  padding-right: 4px;
+}
+
+#zpriucazsi .gt_column_spanner_outer:first-child {
+  padding-left: 0;
+}
+
+#zpriucazsi .gt_column_spanner_outer:last-child {
+  padding-right: 0;
+}
+
+#zpriucazsi .gt_column_spanner {
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  vertical-align: bottom;
+  padding-top: 5px;
+  padding-bottom: 5px;
+  overflow-x: hidden;
+  display: inline-block;
+  width: 100%;
+}
+
+#zpriucazsi .gt_spanner_row {
+  border-bottom-style: hidden;
+}
+
+#zpriucazsi .gt_group_heading {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  text-transform: inherit;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+  vertical-align: middle;
+  text-align: left;
+}
+
+#zpriucazsi .gt_empty_group_heading {
+  padding: 0.5px;
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  vertical-align: middle;
+}
+
+#zpriucazsi .gt_from_md > :first-child {
+  margin-top: 0;
+}
+
+#zpriucazsi .gt_from_md > :last-child {
+  margin-bottom: 0;
+}
+
+#zpriucazsi .gt_row {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  margin: 10px;
+  border-top-style: solid;
+  border-top-width: 1px;
+  border-top-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+  vertical-align: middle;
+  overflow-x: hidden;
+}
+
+#zpriucazsi .gt_stub {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  text-transform: inherit;
+  border-right-style: solid;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#zpriucazsi .gt_stub_row_group {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  text-transform: inherit;
+  border-right-style: solid;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+  padding-left: 5px;
+  padding-right: 5px;
+  vertical-align: top;
+}
+
+#zpriucazsi .gt_row_group_first td {
+  border-top-width: 2px;
+}
+
+#zpriucazsi .gt_row_group_first th {
+  border-top-width: 2px;
+}
+
+#zpriucazsi .gt_summary_row {
+  color: #333333;
+  background-color: #FFFFFF;
+  text-transform: inherit;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#zpriucazsi .gt_first_summary_row {
+  border-top-style: solid;
+  border-top-color: #D3D3D3;
+}
+
+#zpriucazsi .gt_first_summary_row.thick {
+  border-top-width: 2px;
+}
+
+#zpriucazsi .gt_last_summary_row {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+}
+
+#zpriucazsi .gt_grand_summary_row {
+  color: #333333;
+  background-color: #FFFFFF;
+  text-transform: inherit;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#zpriucazsi .gt_first_grand_summary_row {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-top-style: double;
+  border-top-width: 6px;
+  border-top-color: #D3D3D3;
+}
+
+#zpriucazsi .gt_last_grand_summary_row_top {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-bottom-style: double;
+  border-bottom-width: 6px;
+  border-bottom-color: #D3D3D3;
+}
+
+#zpriucazsi .gt_striped {
+  background-color: rgba(128, 128, 128, 0.05);
+}
+
+#zpriucazsi .gt_table_body {
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+}
+
+#zpriucazsi .gt_footnotes {
+  color: #333333;
+  background-color: #FFFFFF;
+  border-bottom-style: none;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 2px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+}
+
+#zpriucazsi .gt_footnote {
+  margin: 0px;
+  font-size: 90%;
+  padding-top: 4px;
+  padding-bottom: 4px;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#zpriucazsi .gt_sourcenotes {
+  color: #333333;
+  background-color: #FFFFFF;
+  border-bottom-style: none;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 2px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+}
+
+#zpriucazsi .gt_sourcenote {
+  font-size: 90%;
+  padding-top: 4px;
+  padding-bottom: 4px;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#zpriucazsi .gt_left {
+  text-align: left;
+}
+
+#zpriucazsi .gt_center {
+  text-align: center;
+}
+
+#zpriucazsi .gt_right {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+#zpriucazsi .gt_font_normal {
+  font-weight: normal;
+}
+
+#zpriucazsi .gt_font_bold {
+  font-weight: bold;
+}
+
+#zpriucazsi .gt_font_italic {
+  font-style: italic;
+}
+
+#zpriucazsi .gt_super {
+  font-size: 65%;
+}
+
+#zpriucazsi .gt_footnote_marks {
+  font-size: 75%;
+  vertical-align: 0.4em;
+  position: initial;
+}
+
+#zpriucazsi .gt_asterisk {
+  font-size: 100%;
+  vertical-align: 0;
+}
+
+#zpriucazsi .gt_indent_1 {
+  text-indent: 5px;
+}
+
+#zpriucazsi .gt_indent_2 {
+  text-indent: 10px;
+}
+
+#zpriucazsi .gt_indent_3 {
+  text-indent: 15px;
+}
+
+#zpriucazsi .gt_indent_4 {
+  text-indent: 20px;
+}
+
+#zpriucazsi .gt_indent_5 {
+  text-indent: 25px;
+}
+
+#zpriucazsi .katex-display {
+  display: inline-flex !important;
+  margin-bottom: 0.75em !important;
+}
+
+#zpriucazsi div.Reactable > div.rt-table > div.rt-thead > div.rt-tr.rt-tr-group-header > div.rt-th-group:after {
+  height: 0px !important;
+}
+</style>
+
+<table class="gt_table caption-top table table-sm table-striped small" data-quarto-postprocess="true" data-quarto-disable-processing="false" data-quarto-bootstrap="false">
+<colgroup>
+<col style="width: 20%">
+<col style="width: 20%">
+<col style="width: 20%">
+<col style="width: 20%">
+<col style="width: 20%">
+</colgroup>
+<thead>
+<tr class="gt_col_headings gt_spanner_row header">
+<th rowspan="2" id="IV" class="gt_col_heading gt_columns_bottom_border gt_left" data-quarto-table-cell-role="th" scope="col">Predictor</th>
+<th colspan="2" id="F4" class="gt_center gt_columns_top_border gt_column_spanner_outer" data-quarto-table-cell-role="th" scope="colgroup"><div class="gt_column_spanner">
+F4
+</div></th>
+<th colspan="2" id="F3" class="gt_center gt_columns_top_border gt_column_spanner_outer" data-quarto-table-cell-role="th" scope="colgroup"><div class="gt_column_spanner">
+F3
+</div></th>
+</tr>
+<tr class="gt_col_headings even">
+<th id="est_col__F4" class="gt_col_heading gt_columns_bottom_border gt_right" data-quarto-table-cell-role="th" scope="col">Est.</th>
+<th id="se_col__F4" class="gt_col_heading gt_columns_bottom_border gt_right" data-quarto-table-cell-role="th" scope="col">SE</th>
+<th id="est_col__F3" class="gt_col_heading gt_columns_bottom_border gt_right" data-quarto-table-cell-role="th" scope="col">Est.</th>
+<th id="se_col__F3" class="gt_col_heading gt_columns_bottom_border gt_right" data-quarto-table-cell-role="th" scope="col">SE</th>
+</tr>
+</thead>
+<tbody class="gt_table_body">
+<tr class="odd">
+<td class="gt_row gt_left" headers="IV">F3</td>
+<td class="gt_row gt_right" headers="est_col__F4">0.473*</td>
+<td class="gt_row gt_right" headers="se_col__F4">0.057</td>
+<td class="gt_row gt_right" headers="est_col__F3">NA</td>
+<td class="gt_row gt_right" headers="se_col__F3">NA</td>
+</tr>
+<tr class="even">
+<td class="gt_row gt_left" headers="IV">F1</td>
+<td class="gt_row gt_right" headers="est_col__F4">NA</td>
+<td class="gt_row gt_right" headers="se_col__F4">NA</td>
+<td class="gt_row gt_right" headers="est_col__F3">0.563*</td>
+<td class="gt_row gt_right" headers="se_col__F3">0.070</td>
+</tr>
+<tr class="odd">
+<td class="gt_row gt_left" headers="IV">F2</td>
+<td class="gt_row gt_right" headers="est_col__F4">NA</td>
+<td class="gt_row gt_right" headers="se_col__F4">NA</td>
+<td class="gt_row gt_right" headers="est_col__F3">0.790*</td>
+<td class="gt_row gt_right" headers="se_col__F3">0.086</td>
+</tr>
+</tbody><tfoot>
+<tr class="gt_footnotes odd">
+<td colspan="5" class="gt_footnote">* p &lt; 0.05</td>
+</tr>
+</tfoot>
+
+</table>
+
+</div>
+</div>
+</div>
+<p>Switch to an estimate + confidence-interval display with <code>display_type = "est_ci"</code>; stars now mark intervals that exclude zero:</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb7"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="fu">coef_table_mplus</span>(m_sem, <span class="at">display_type =</span> <span class="st">"est_ci"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div id="oypgtrjyeh" style="padding-left:0px;padding-right:0px;padding-top:10px;padding-bottom:10px;overflow-x:auto;overflow-y:auto;width:auto;height:auto;">
+<style>#oypgtrjyeh table {
+  font-family: system-ui, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#oypgtrjyeh thead, #oypgtrjyeh tbody, #oypgtrjyeh tfoot, #oypgtrjyeh tr, #oypgtrjyeh td, #oypgtrjyeh th {
+  border-style: none;
+}
+
+#oypgtrjyeh p {
+  margin: 0;
+  padding: 0;
+}
+
+#oypgtrjyeh .gt_table {
+  display: table;
+  border-collapse: collapse;
+  line-height: normal;
+  margin-left: auto;
+  margin-right: auto;
+  color: #333333;
+  font-size: 16px;
+  font-weight: normal;
+  font-style: normal;
+  background-color: #FFFFFF;
+  width: auto;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #A8A8A8;
+  border-right-style: none;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #A8A8A8;
+  border-left-style: none;
+  border-left-width: 2px;
+  border-left-color: #D3D3D3;
+}
+
+#oypgtrjyeh .gt_caption {
+  padding-top: 4px;
+  padding-bottom: 4px;
+}
+
+#oypgtrjyeh .gt_title {
+  color: #333333;
+  font-size: 125%;
+  font-weight: initial;
+  padding-top: 4px;
+  padding-bottom: 4px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-bottom-color: #FFFFFF;
+  border-bottom-width: 0;
+}
+
+#oypgtrjyeh .gt_subtitle {
+  color: #333333;
+  font-size: 85%;
+  font-weight: initial;
+  padding-top: 3px;
+  padding-bottom: 5px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-top-color: #FFFFFF;
+  border-top-width: 0;
+}
+
+#oypgtrjyeh .gt_heading {
+  background-color: #FFFFFF;
+  text-align: center;
+  border-bottom-color: #FFFFFF;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+}
+
+#oypgtrjyeh .gt_bottom_border {
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+}
+
+#oypgtrjyeh .gt_col_headings {
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+}
+
+#oypgtrjyeh .gt_col_heading {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: normal;
+  text-transform: inherit;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+  vertical-align: bottom;
+  padding-top: 5px;
+  padding-bottom: 6px;
+  padding-left: 5px;
+  padding-right: 5px;
+  overflow-x: hidden;
+}
+
+#oypgtrjyeh .gt_column_spanner_outer {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: normal;
+  text-transform: inherit;
+  padding-top: 0;
+  padding-bottom: 0;
+  padding-left: 4px;
+  padding-right: 4px;
+}
+
+#oypgtrjyeh .gt_column_spanner_outer:first-child {
+  padding-left: 0;
+}
+
+#oypgtrjyeh .gt_column_spanner_outer:last-child {
+  padding-right: 0;
+}
+
+#oypgtrjyeh .gt_column_spanner {
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  vertical-align: bottom;
+  padding-top: 5px;
+  padding-bottom: 5px;
+  overflow-x: hidden;
+  display: inline-block;
+  width: 100%;
+}
+
+#oypgtrjyeh .gt_spanner_row {
+  border-bottom-style: hidden;
+}
+
+#oypgtrjyeh .gt_group_heading {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  text-transform: inherit;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+  vertical-align: middle;
+  text-align: left;
+}
+
+#oypgtrjyeh .gt_empty_group_heading {
+  padding: 0.5px;
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  vertical-align: middle;
+}
+
+#oypgtrjyeh .gt_from_md > :first-child {
+  margin-top: 0;
+}
+
+#oypgtrjyeh .gt_from_md > :last-child {
+  margin-bottom: 0;
+}
+
+#oypgtrjyeh .gt_row {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  margin: 10px;
+  border-top-style: solid;
+  border-top-width: 1px;
+  border-top-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+  vertical-align: middle;
+  overflow-x: hidden;
+}
+
+#oypgtrjyeh .gt_stub {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  text-transform: inherit;
+  border-right-style: solid;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#oypgtrjyeh .gt_stub_row_group {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  text-transform: inherit;
+  border-right-style: solid;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+  padding-left: 5px;
+  padding-right: 5px;
+  vertical-align: top;
+}
+
+#oypgtrjyeh .gt_row_group_first td {
+  border-top-width: 2px;
+}
+
+#oypgtrjyeh .gt_row_group_first th {
+  border-top-width: 2px;
+}
+
+#oypgtrjyeh .gt_summary_row {
+  color: #333333;
+  background-color: #FFFFFF;
+  text-transform: inherit;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#oypgtrjyeh .gt_first_summary_row {
+  border-top-style: solid;
+  border-top-color: #D3D3D3;
+}
+
+#oypgtrjyeh .gt_first_summary_row.thick {
+  border-top-width: 2px;
+}
+
+#oypgtrjyeh .gt_last_summary_row {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+}
+
+#oypgtrjyeh .gt_grand_summary_row {
+  color: #333333;
+  background-color: #FFFFFF;
+  text-transform: inherit;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#oypgtrjyeh .gt_first_grand_summary_row {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-top-style: double;
+  border-top-width: 6px;
+  border-top-color: #D3D3D3;
+}
+
+#oypgtrjyeh .gt_last_grand_summary_row_top {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-bottom-style: double;
+  border-bottom-width: 6px;
+  border-bottom-color: #D3D3D3;
+}
+
+#oypgtrjyeh .gt_striped {
+  background-color: rgba(128, 128, 128, 0.05);
+}
+
+#oypgtrjyeh .gt_table_body {
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+}
+
+#oypgtrjyeh .gt_footnotes {
+  color: #333333;
+  background-color: #FFFFFF;
+  border-bottom-style: none;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 2px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+}
+
+#oypgtrjyeh .gt_footnote {
+  margin: 0px;
+  font-size: 90%;
+  padding-top: 4px;
+  padding-bottom: 4px;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#oypgtrjyeh .gt_sourcenotes {
+  color: #333333;
+  background-color: #FFFFFF;
+  border-bottom-style: none;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 2px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+}
+
+#oypgtrjyeh .gt_sourcenote {
+  font-size: 90%;
+  padding-top: 4px;
+  padding-bottom: 4px;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#oypgtrjyeh .gt_left {
+  text-align: left;
+}
+
+#oypgtrjyeh .gt_center {
+  text-align: center;
+}
+
+#oypgtrjyeh .gt_right {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+#oypgtrjyeh .gt_font_normal {
+  font-weight: normal;
+}
+
+#oypgtrjyeh .gt_font_bold {
+  font-weight: bold;
+}
+
+#oypgtrjyeh .gt_font_italic {
+  font-style: italic;
+}
+
+#oypgtrjyeh .gt_super {
+  font-size: 65%;
+}
+
+#oypgtrjyeh .gt_footnote_marks {
+  font-size: 75%;
+  vertical-align: 0.4em;
+  position: initial;
+}
+
+#oypgtrjyeh .gt_asterisk {
+  font-size: 100%;
+  vertical-align: 0;
+}
+
+#oypgtrjyeh .gt_indent_1 {
+  text-indent: 5px;
+}
+
+#oypgtrjyeh .gt_indent_2 {
+  text-indent: 10px;
+}
+
+#oypgtrjyeh .gt_indent_3 {
+  text-indent: 15px;
+}
+
+#oypgtrjyeh .gt_indent_4 {
+  text-indent: 20px;
+}
+
+#oypgtrjyeh .gt_indent_5 {
+  text-indent: 25px;
+}
+
+#oypgtrjyeh .katex-display {
+  display: inline-flex !important;
+  margin-bottom: 0.75em !important;
+}
+
+#oypgtrjyeh div.Reactable > div.rt-table > div.rt-thead > div.rt-tr.rt-tr-group-header > div.rt-th-group:after {
+  height: 0px !important;
+}
+</style>
+
+<table class="gt_table caption-top table table-sm table-striped small" data-quarto-postprocess="true" data-quarto-disable-processing="false" data-quarto-bootstrap="false">
+<colgroup>
+<col style="width: 14%">
+<col style="width: 14%">
+<col style="width: 14%">
+<col style="width: 14%">
+<col style="width: 14%">
+<col style="width: 14%">
+<col style="width: 14%">
+</colgroup>
+<thead>
+<tr class="gt_col_headings gt_spanner_row header">
+<th rowspan="2" id="IV" class="gt_col_heading gt_columns_bottom_border gt_left" data-quarto-table-cell-role="th" scope="col">Predictor</th>
+<th colspan="3" id="F4" class="gt_center gt_columns_top_border gt_column_spanner_outer" data-quarto-table-cell-role="th" scope="colgroup"><div class="gt_column_spanner">
+F4
+</div></th>
+<th colspan="3" id="F3" class="gt_center gt_columns_top_border gt_column_spanner_outer" data-quarto-table-cell-role="th" scope="colgroup"><div class="gt_column_spanner">
+F3
+</div></th>
+</tr>
+<tr class="gt_col_headings even">
+<th id="est_col__F4" class="gt_col_heading gt_columns_bottom_border gt_right" data-quarto-table-cell-role="th" scope="col">Est.</th>
+<th id="ll_col__F4" class="gt_col_heading gt_columns_bottom_border gt_right" data-quarto-table-cell-role="th" scope="col">LL</th>
+<th id="ul_col__F4" class="gt_col_heading gt_columns_bottom_border gt_right" data-quarto-table-cell-role="th" scope="col">UL</th>
+<th id="est_col__F3" class="gt_col_heading gt_columns_bottom_border gt_right" data-quarto-table-cell-role="th" scope="col">Est.</th>
+<th id="ll_col__F3" class="gt_col_heading gt_columns_bottom_border gt_right" data-quarto-table-cell-role="th" scope="col">LL</th>
+<th id="ul_col__F3" class="gt_col_heading gt_columns_bottom_border gt_right" data-quarto-table-cell-role="th" scope="col">UL</th>
+</tr>
+</thead>
+<tbody class="gt_table_body">
+<tr class="odd">
+<td class="gt_row gt_left" headers="IV">F3</td>
+<td class="gt_row gt_right" headers="est_col__F4">0.473*</td>
+<td class="gt_row gt_right" headers="ll_col__F4">0.361</td>
+<td class="gt_row gt_right" headers="ul_col__F4">0.585</td>
+<td class="gt_row gt_right" headers="est_col__F3">NA</td>
+<td class="gt_row gt_right" headers="ll_col__F3">NA</td>
+<td class="gt_row gt_right" headers="ul_col__F3">NA</td>
+</tr>
+<tr class="even">
+<td class="gt_row gt_left" headers="IV">F1</td>
+<td class="gt_row gt_right" headers="est_col__F4">NA</td>
+<td class="gt_row gt_right" headers="ll_col__F4">NA</td>
+<td class="gt_row gt_right" headers="ul_col__F4">NA</td>
+<td class="gt_row gt_right" headers="est_col__F3">0.563*</td>
+<td class="gt_row gt_right" headers="ll_col__F3">0.425</td>
+<td class="gt_row gt_right" headers="ul_col__F3">0.700</td>
+</tr>
+<tr class="odd">
+<td class="gt_row gt_left" headers="IV">F2</td>
+<td class="gt_row gt_right" headers="est_col__F4">NA</td>
+<td class="gt_row gt_right" headers="ll_col__F4">NA</td>
+<td class="gt_row gt_right" headers="ul_col__F4">NA</td>
+<td class="gt_row gt_right" headers="est_col__F3">0.790*</td>
+<td class="gt_row gt_right" headers="ll_col__F3">0.622</td>
+<td class="gt_row gt_right" headers="ul_col__F3">0.958</td>
+</tr>
+</tbody><tfoot>
+<tr class="gt_footnotes odd">
+<td colspan="7" class="gt_footnote">* 95% confidence interval excludes zero.</td>
+</tr>
+</tfoot>
+
+</table>
+
+</div>
+</div>
+</div>
+<p>Rename the cryptic Mplus factor labels with <code>label_replace</code>, and fill empty cells with <code>na_replace</code>:</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb8"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="fu">coef_table_mplus</span>(</span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>  m_sem,</span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">label_replace =</span> <span class="fu">c</span>(<span class="st">"F1"</span> <span class="ot">=</span> <span class="st">"Predictor 1"</span>, <span class="st">"F2"</span> <span class="ot">=</span> <span class="st">"Predictor 2"</span>,</span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a>                    <span class="st">"F3"</span> <span class="ot">=</span> <span class="st">"Mediator"</span>,    <span class="st">"F4"</span> <span class="ot">=</span> <span class="st">"Outcome"</span>),</span>
+<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a>  <span class="at">na_replace    =</span> <span class="st">"-"</span></span>
+<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div id="mdedjysmyf" style="padding-left:0px;padding-right:0px;padding-top:10px;padding-bottom:10px;overflow-x:auto;overflow-y:auto;width:auto;height:auto;">
+<style>#mdedjysmyf table {
+  font-family: system-ui, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#mdedjysmyf thead, #mdedjysmyf tbody, #mdedjysmyf tfoot, #mdedjysmyf tr, #mdedjysmyf td, #mdedjysmyf th {
+  border-style: none;
+}
+
+#mdedjysmyf p {
+  margin: 0;
+  padding: 0;
+}
+
+#mdedjysmyf .gt_table {
+  display: table;
+  border-collapse: collapse;
+  line-height: normal;
+  margin-left: auto;
+  margin-right: auto;
+  color: #333333;
+  font-size: 16px;
+  font-weight: normal;
+  font-style: normal;
+  background-color: #FFFFFF;
+  width: auto;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #A8A8A8;
+  border-right-style: none;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #A8A8A8;
+  border-left-style: none;
+  border-left-width: 2px;
+  border-left-color: #D3D3D3;
+}
+
+#mdedjysmyf .gt_caption {
+  padding-top: 4px;
+  padding-bottom: 4px;
+}
+
+#mdedjysmyf .gt_title {
+  color: #333333;
+  font-size: 125%;
+  font-weight: initial;
+  padding-top: 4px;
+  padding-bottom: 4px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-bottom-color: #FFFFFF;
+  border-bottom-width: 0;
+}
+
+#mdedjysmyf .gt_subtitle {
+  color: #333333;
+  font-size: 85%;
+  font-weight: initial;
+  padding-top: 3px;
+  padding-bottom: 5px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-top-color: #FFFFFF;
+  border-top-width: 0;
+}
+
+#mdedjysmyf .gt_heading {
+  background-color: #FFFFFF;
+  text-align: center;
+  border-bottom-color: #FFFFFF;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+}
+
+#mdedjysmyf .gt_bottom_border {
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+}
+
+#mdedjysmyf .gt_col_headings {
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+}
+
+#mdedjysmyf .gt_col_heading {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: normal;
+  text-transform: inherit;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+  vertical-align: bottom;
+  padding-top: 5px;
+  padding-bottom: 6px;
+  padding-left: 5px;
+  padding-right: 5px;
+  overflow-x: hidden;
+}
+
+#mdedjysmyf .gt_column_spanner_outer {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: normal;
+  text-transform: inherit;
+  padding-top: 0;
+  padding-bottom: 0;
+  padding-left: 4px;
+  padding-right: 4px;
+}
+
+#mdedjysmyf .gt_column_spanner_outer:first-child {
+  padding-left: 0;
+}
+
+#mdedjysmyf .gt_column_spanner_outer:last-child {
+  padding-right: 0;
+}
+
+#mdedjysmyf .gt_column_spanner {
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  vertical-align: bottom;
+  padding-top: 5px;
+  padding-bottom: 5px;
+  overflow-x: hidden;
+  display: inline-block;
+  width: 100%;
+}
+
+#mdedjysmyf .gt_spanner_row {
+  border-bottom-style: hidden;
+}
+
+#mdedjysmyf .gt_group_heading {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  text-transform: inherit;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+  vertical-align: middle;
+  text-align: left;
+}
+
+#mdedjysmyf .gt_empty_group_heading {
+  padding: 0.5px;
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  vertical-align: middle;
+}
+
+#mdedjysmyf .gt_from_md > :first-child {
+  margin-top: 0;
+}
+
+#mdedjysmyf .gt_from_md > :last-child {
+  margin-bottom: 0;
+}
+
+#mdedjysmyf .gt_row {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  margin: 10px;
+  border-top-style: solid;
+  border-top-width: 1px;
+  border-top-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+  vertical-align: middle;
+  overflow-x: hidden;
+}
+
+#mdedjysmyf .gt_stub {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  text-transform: inherit;
+  border-right-style: solid;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#mdedjysmyf .gt_stub_row_group {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  text-transform: inherit;
+  border-right-style: solid;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+  padding-left: 5px;
+  padding-right: 5px;
+  vertical-align: top;
+}
+
+#mdedjysmyf .gt_row_group_first td {
+  border-top-width: 2px;
+}
+
+#mdedjysmyf .gt_row_group_first th {
+  border-top-width: 2px;
+}
+
+#mdedjysmyf .gt_summary_row {
+  color: #333333;
+  background-color: #FFFFFF;
+  text-transform: inherit;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#mdedjysmyf .gt_first_summary_row {
+  border-top-style: solid;
+  border-top-color: #D3D3D3;
+}
+
+#mdedjysmyf .gt_first_summary_row.thick {
+  border-top-width: 2px;
+}
+
+#mdedjysmyf .gt_last_summary_row {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+}
+
+#mdedjysmyf .gt_grand_summary_row {
+  color: #333333;
+  background-color: #FFFFFF;
+  text-transform: inherit;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#mdedjysmyf .gt_first_grand_summary_row {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-top-style: double;
+  border-top-width: 6px;
+  border-top-color: #D3D3D3;
+}
+
+#mdedjysmyf .gt_last_grand_summary_row_top {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-bottom-style: double;
+  border-bottom-width: 6px;
+  border-bottom-color: #D3D3D3;
+}
+
+#mdedjysmyf .gt_striped {
+  background-color: rgba(128, 128, 128, 0.05);
+}
+
+#mdedjysmyf .gt_table_body {
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+}
+
+#mdedjysmyf .gt_footnotes {
+  color: #333333;
+  background-color: #FFFFFF;
+  border-bottom-style: none;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 2px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+}
+
+#mdedjysmyf .gt_footnote {
+  margin: 0px;
+  font-size: 90%;
+  padding-top: 4px;
+  padding-bottom: 4px;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#mdedjysmyf .gt_sourcenotes {
+  color: #333333;
+  background-color: #FFFFFF;
+  border-bottom-style: none;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 2px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+}
+
+#mdedjysmyf .gt_sourcenote {
+  font-size: 90%;
+  padding-top: 4px;
+  padding-bottom: 4px;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#mdedjysmyf .gt_left {
+  text-align: left;
+}
+
+#mdedjysmyf .gt_center {
+  text-align: center;
+}
+
+#mdedjysmyf .gt_right {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+#mdedjysmyf .gt_font_normal {
+  font-weight: normal;
+}
+
+#mdedjysmyf .gt_font_bold {
+  font-weight: bold;
+}
+
+#mdedjysmyf .gt_font_italic {
+  font-style: italic;
+}
+
+#mdedjysmyf .gt_super {
+  font-size: 65%;
+}
+
+#mdedjysmyf .gt_footnote_marks {
+  font-size: 75%;
+  vertical-align: 0.4em;
+  position: initial;
+}
+
+#mdedjysmyf .gt_asterisk {
+  font-size: 100%;
+  vertical-align: 0;
+}
+
+#mdedjysmyf .gt_indent_1 {
+  text-indent: 5px;
+}
+
+#mdedjysmyf .gt_indent_2 {
+  text-indent: 10px;
+}
+
+#mdedjysmyf .gt_indent_3 {
+  text-indent: 15px;
+}
+
+#mdedjysmyf .gt_indent_4 {
+  text-indent: 20px;
+}
+
+#mdedjysmyf .gt_indent_5 {
+  text-indent: 25px;
+}
+
+#mdedjysmyf .katex-display {
+  display: inline-flex !important;
+  margin-bottom: 0.75em !important;
+}
+
+#mdedjysmyf div.Reactable > div.rt-table > div.rt-thead > div.rt-tr.rt-tr-group-header > div.rt-th-group:after {
+  height: 0px !important;
+}
+</style>
+
+<table class="gt_table caption-top table table-sm table-striped small" data-quarto-postprocess="true" data-quarto-disable-processing="false" data-quarto-bootstrap="false">
+<colgroup>
+<col style="width: 20%">
+<col style="width: 20%">
+<col style="width: 20%">
+<col style="width: 20%">
+<col style="width: 20%">
+</colgroup>
+<thead>
+<tr class="gt_col_headings gt_spanner_row header">
+<th rowspan="2" id="IV" class="gt_col_heading gt_columns_bottom_border gt_left" data-quarto-table-cell-role="th" scope="col">Predictor</th>
+<th colspan="2" id="Outcome" class="gt_center gt_columns_top_border gt_column_spanner_outer" data-quarto-table-cell-role="th" scope="colgroup"><div class="gt_column_spanner">
+Outcome
+</div></th>
+<th colspan="2" id="Mediator" class="gt_center gt_columns_top_border gt_column_spanner_outer" data-quarto-table-cell-role="th" scope="colgroup"><div class="gt_column_spanner">
+Mediator
+</div></th>
+</tr>
+<tr class="gt_col_headings even">
+<th id="est_col__Outcome" class="gt_col_heading gt_columns_bottom_border gt_right" data-quarto-table-cell-role="th" scope="col">Est.</th>
+<th id="se_col__Outcome" class="gt_col_heading gt_columns_bottom_border gt_right" data-quarto-table-cell-role="th" scope="col">SE</th>
+<th id="est_col__Mediator" class="gt_col_heading gt_columns_bottom_border gt_right" data-quarto-table-cell-role="th" scope="col">Est.</th>
+<th id="se_col__Mediator" class="gt_col_heading gt_columns_bottom_border gt_right" data-quarto-table-cell-role="th" scope="col">SE</th>
+</tr>
+</thead>
+<tbody class="gt_table_body">
+<tr class="odd">
+<td class="gt_row gt_left" headers="IV">Mediator</td>
+<td class="gt_row gt_right" headers="est_col__Outcome">0.473*</td>
+<td class="gt_row gt_right" headers="se_col__Outcome">0.057</td>
+<td class="gt_row gt_right" headers="est_col__Mediator">-</td>
+<td class="gt_row gt_right" headers="se_col__Mediator">-</td>
+</tr>
+<tr class="even">
+<td class="gt_row gt_left" headers="IV">Predictor 1</td>
+<td class="gt_row gt_right" headers="est_col__Outcome">-</td>
+<td class="gt_row gt_right" headers="se_col__Outcome">-</td>
+<td class="gt_row gt_right" headers="est_col__Mediator">0.563*</td>
+<td class="gt_row gt_right" headers="se_col__Mediator">0.070</td>
+</tr>
+<tr class="odd">
+<td class="gt_row gt_left" headers="IV">Predictor 2</td>
+<td class="gt_row gt_right" headers="est_col__Outcome">-</td>
+<td class="gt_row gt_right" headers="se_col__Outcome">-</td>
+<td class="gt_row gt_right" headers="est_col__Mediator">0.790*</td>
+<td class="gt_row gt_right" headers="se_col__Mediator">0.086</td>
+</tr>
+</tbody><tfoot>
+<tr class="gt_footnotes odd">
+<td colspan="5" class="gt_footnote">* p &lt; 0.05</td>
+</tr>
+</tfoot>
+
+</table>
+
+</div>
+</div>
+</div>
+</section>
+<section id="bayesian-estimation-is-detected-automatically" class="level2">
+<h2 class="anchored" data-anchor-id="bayesian-estimation-is-detected-automatically">Bayesian estimation is detected automatically</h2>
+<p><code>ex5.11_BAYES</code> is the same model estimated with <code>ESTIMATOR = BAYES</code>. The tools detect this, switch the default display to estimate + 95% <strong>credibility</strong> interval, and emit a message reminding you that Mplus Bayesian <em>p</em>-values are one-tailed.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb9"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>m_sem_bayes <span class="ot">&lt;-</span> <span class="fu">readModels</span>(<span class="fu">mplus_file</span>(<span class="st">"ex5.11_BAYES.out"</span>), <span class="at">quiet =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a><span class="fu">coef_table_mplus</span>(m_sem_bayes)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stderr">
+<pre><code>Bayesian estimator detected: p-values in this output are one-tailed.</code></pre>
+</div>
+<div class="cell-output-display">
+<div id="ylpwlevwcy" style="padding-left:0px;padding-right:0px;padding-top:10px;padding-bottom:10px;overflow-x:auto;overflow-y:auto;width:auto;height:auto;">
+<style>#ylpwlevwcy table {
+  font-family: system-ui, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#ylpwlevwcy thead, #ylpwlevwcy tbody, #ylpwlevwcy tfoot, #ylpwlevwcy tr, #ylpwlevwcy td, #ylpwlevwcy th {
+  border-style: none;
+}
+
+#ylpwlevwcy p {
+  margin: 0;
+  padding: 0;
+}
+
+#ylpwlevwcy .gt_table {
+  display: table;
+  border-collapse: collapse;
+  line-height: normal;
+  margin-left: auto;
+  margin-right: auto;
+  color: #333333;
+  font-size: 16px;
+  font-weight: normal;
+  font-style: normal;
+  background-color: #FFFFFF;
+  width: auto;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #A8A8A8;
+  border-right-style: none;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #A8A8A8;
+  border-left-style: none;
+  border-left-width: 2px;
+  border-left-color: #D3D3D3;
+}
+
+#ylpwlevwcy .gt_caption {
+  padding-top: 4px;
+  padding-bottom: 4px;
+}
+
+#ylpwlevwcy .gt_title {
+  color: #333333;
+  font-size: 125%;
+  font-weight: initial;
+  padding-top: 4px;
+  padding-bottom: 4px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-bottom-color: #FFFFFF;
+  border-bottom-width: 0;
+}
+
+#ylpwlevwcy .gt_subtitle {
+  color: #333333;
+  font-size: 85%;
+  font-weight: initial;
+  padding-top: 3px;
+  padding-bottom: 5px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-top-color: #FFFFFF;
+  border-top-width: 0;
+}
+
+#ylpwlevwcy .gt_heading {
+  background-color: #FFFFFF;
+  text-align: center;
+  border-bottom-color: #FFFFFF;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+}
+
+#ylpwlevwcy .gt_bottom_border {
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+}
+
+#ylpwlevwcy .gt_col_headings {
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+}
+
+#ylpwlevwcy .gt_col_heading {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: normal;
+  text-transform: inherit;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+  vertical-align: bottom;
+  padding-top: 5px;
+  padding-bottom: 6px;
+  padding-left: 5px;
+  padding-right: 5px;
+  overflow-x: hidden;
+}
+
+#ylpwlevwcy .gt_column_spanner_outer {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: normal;
+  text-transform: inherit;
+  padding-top: 0;
+  padding-bottom: 0;
+  padding-left: 4px;
+  padding-right: 4px;
+}
+
+#ylpwlevwcy .gt_column_spanner_outer:first-child {
+  padding-left: 0;
+}
+
+#ylpwlevwcy .gt_column_spanner_outer:last-child {
+  padding-right: 0;
+}
+
+#ylpwlevwcy .gt_column_spanner {
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  vertical-align: bottom;
+  padding-top: 5px;
+  padding-bottom: 5px;
+  overflow-x: hidden;
+  display: inline-block;
+  width: 100%;
+}
+
+#ylpwlevwcy .gt_spanner_row {
+  border-bottom-style: hidden;
+}
+
+#ylpwlevwcy .gt_group_heading {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  text-transform: inherit;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+  vertical-align: middle;
+  text-align: left;
+}
+
+#ylpwlevwcy .gt_empty_group_heading {
+  padding: 0.5px;
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  vertical-align: middle;
+}
+
+#ylpwlevwcy .gt_from_md > :first-child {
+  margin-top: 0;
+}
+
+#ylpwlevwcy .gt_from_md > :last-child {
+  margin-bottom: 0;
+}
+
+#ylpwlevwcy .gt_row {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  margin: 10px;
+  border-top-style: solid;
+  border-top-width: 1px;
+  border-top-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+  vertical-align: middle;
+  overflow-x: hidden;
+}
+
+#ylpwlevwcy .gt_stub {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  text-transform: inherit;
+  border-right-style: solid;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#ylpwlevwcy .gt_stub_row_group {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  text-transform: inherit;
+  border-right-style: solid;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+  padding-left: 5px;
+  padding-right: 5px;
+  vertical-align: top;
+}
+
+#ylpwlevwcy .gt_row_group_first td {
+  border-top-width: 2px;
+}
+
+#ylpwlevwcy .gt_row_group_first th {
+  border-top-width: 2px;
+}
+
+#ylpwlevwcy .gt_summary_row {
+  color: #333333;
+  background-color: #FFFFFF;
+  text-transform: inherit;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#ylpwlevwcy .gt_first_summary_row {
+  border-top-style: solid;
+  border-top-color: #D3D3D3;
+}
+
+#ylpwlevwcy .gt_first_summary_row.thick {
+  border-top-width: 2px;
+}
+
+#ylpwlevwcy .gt_last_summary_row {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+}
+
+#ylpwlevwcy .gt_grand_summary_row {
+  color: #333333;
+  background-color: #FFFFFF;
+  text-transform: inherit;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#ylpwlevwcy .gt_first_grand_summary_row {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-top-style: double;
+  border-top-width: 6px;
+  border-top-color: #D3D3D3;
+}
+
+#ylpwlevwcy .gt_last_grand_summary_row_top {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-bottom-style: double;
+  border-bottom-width: 6px;
+  border-bottom-color: #D3D3D3;
+}
+
+#ylpwlevwcy .gt_striped {
+  background-color: rgba(128, 128, 128, 0.05);
+}
+
+#ylpwlevwcy .gt_table_body {
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+}
+
+#ylpwlevwcy .gt_footnotes {
+  color: #333333;
+  background-color: #FFFFFF;
+  border-bottom-style: none;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 2px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+}
+
+#ylpwlevwcy .gt_footnote {
+  margin: 0px;
+  font-size: 90%;
+  padding-top: 4px;
+  padding-bottom: 4px;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#ylpwlevwcy .gt_sourcenotes {
+  color: #333333;
+  background-color: #FFFFFF;
+  border-bottom-style: none;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 2px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+}
+
+#ylpwlevwcy .gt_sourcenote {
+  font-size: 90%;
+  padding-top: 4px;
+  padding-bottom: 4px;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#ylpwlevwcy .gt_left {
+  text-align: left;
+}
+
+#ylpwlevwcy .gt_center {
+  text-align: center;
+}
+
+#ylpwlevwcy .gt_right {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+#ylpwlevwcy .gt_font_normal {
+  font-weight: normal;
+}
+
+#ylpwlevwcy .gt_font_bold {
+  font-weight: bold;
+}
+
+#ylpwlevwcy .gt_font_italic {
+  font-style: italic;
+}
+
+#ylpwlevwcy .gt_super {
+  font-size: 65%;
+}
+
+#ylpwlevwcy .gt_footnote_marks {
+  font-size: 75%;
+  vertical-align: 0.4em;
+  position: initial;
+}
+
+#ylpwlevwcy .gt_asterisk {
+  font-size: 100%;
+  vertical-align: 0;
+}
+
+#ylpwlevwcy .gt_indent_1 {
+  text-indent: 5px;
+}
+
+#ylpwlevwcy .gt_indent_2 {
+  text-indent: 10px;
+}
+
+#ylpwlevwcy .gt_indent_3 {
+  text-indent: 15px;
+}
+
+#ylpwlevwcy .gt_indent_4 {
+  text-indent: 20px;
+}
+
+#ylpwlevwcy .gt_indent_5 {
+  text-indent: 25px;
+}
+
+#ylpwlevwcy .katex-display {
+  display: inline-flex !important;
+  margin-bottom: 0.75em !important;
+}
+
+#ylpwlevwcy div.Reactable > div.rt-table > div.rt-thead > div.rt-tr.rt-tr-group-header > div.rt-th-group:after {
+  height: 0px !important;
+}
+</style>
+
+<table class="gt_table caption-top table table-sm table-striped small" data-quarto-postprocess="true" data-quarto-disable-processing="false" data-quarto-bootstrap="false">
+<colgroup>
+<col style="width: 14%">
+<col style="width: 14%">
+<col style="width: 14%">
+<col style="width: 14%">
+<col style="width: 14%">
+<col style="width: 14%">
+<col style="width: 14%">
+</colgroup>
+<thead>
+<tr class="gt_col_headings gt_spanner_row header">
+<th rowspan="2" id="IV" class="gt_col_heading gt_columns_bottom_border gt_left" data-quarto-table-cell-role="th" scope="col">Predictor</th>
+<th colspan="3" id="F4" class="gt_center gt_columns_top_border gt_column_spanner_outer" data-quarto-table-cell-role="th" scope="colgroup"><div class="gt_column_spanner">
+F4
+</div></th>
+<th colspan="3" id="F3" class="gt_center gt_columns_top_border gt_column_spanner_outer" data-quarto-table-cell-role="th" scope="colgroup"><div class="gt_column_spanner">
+F3
+</div></th>
+</tr>
+<tr class="gt_col_headings even">
+<th id="est_col__F4" class="gt_col_heading gt_columns_bottom_border gt_right" data-quarto-table-cell-role="th" scope="col">Est.</th>
+<th id="ll_col__F4" class="gt_col_heading gt_columns_bottom_border gt_right" data-quarto-table-cell-role="th" scope="col">LL</th>
+<th id="ul_col__F4" class="gt_col_heading gt_columns_bottom_border gt_right" data-quarto-table-cell-role="th" scope="col">UL</th>
+<th id="est_col__F3" class="gt_col_heading gt_columns_bottom_border gt_right" data-quarto-table-cell-role="th" scope="col">Est.</th>
+<th id="ll_col__F3" class="gt_col_heading gt_columns_bottom_border gt_right" data-quarto-table-cell-role="th" scope="col">LL</th>
+<th id="ul_col__F3" class="gt_col_heading gt_columns_bottom_border gt_right" data-quarto-table-cell-role="th" scope="col">UL</th>
+</tr>
+</thead>
+<tbody class="gt_table_body">
+<tr class="odd">
+<td class="gt_row gt_left" headers="IV">F3</td>
+<td class="gt_row gt_right" headers="est_col__F4">0.466*</td>
+<td class="gt_row gt_right" headers="ll_col__F4">0.353</td>
+<td class="gt_row gt_right" headers="ul_col__F4">0.582</td>
+<td class="gt_row gt_right" headers="est_col__F3">NA</td>
+<td class="gt_row gt_right" headers="ll_col__F3">NA</td>
+<td class="gt_row gt_right" headers="ul_col__F3">NA</td>
+</tr>
+<tr class="even">
+<td class="gt_row gt_left" headers="IV">F1</td>
+<td class="gt_row gt_right" headers="est_col__F4">NA</td>
+<td class="gt_row gt_right" headers="ll_col__F4">NA</td>
+<td class="gt_row gt_right" headers="ul_col__F4">NA</td>
+<td class="gt_row gt_right" headers="est_col__F3">0.560*</td>
+<td class="gt_row gt_right" headers="ll_col__F3">0.428</td>
+<td class="gt_row gt_right" headers="ul_col__F3">0.715</td>
+</tr>
+<tr class="odd">
+<td class="gt_row gt_left" headers="IV">F2</td>
+<td class="gt_row gt_right" headers="est_col__F4">NA</td>
+<td class="gt_row gt_right" headers="ll_col__F4">NA</td>
+<td class="gt_row gt_right" headers="ul_col__F4">NA</td>
+<td class="gt_row gt_right" headers="est_col__F3">0.799*</td>
+<td class="gt_row gt_right" headers="ll_col__F3">0.635</td>
+<td class="gt_row gt_right" headers="ul_col__F3">0.984</td>
+</tr>
+</tbody><tfoot>
+<tr class="gt_footnotes odd">
+<td colspan="7" class="gt_footnote">* 95% credibility interval excludes zero.</td>
+</tr>
+</tfoot>
+
+</table>
+
+</div>
+</div>
+</div>
+<p>You can always override the auto-detection with the <code>bayes</code> and <code>display_type</code> arguments.</p>
+</section>
+</section>
+<section id="part-2-a-two-level-model-with-a-random-slope" class="level1">
+<h1>Part 2: A two-level model with a random slope</h1>
+<p><code>ex9.2c</code> is a two-level regression (Mplus User’s Guide example 9.2c). The model is:</p>
+<div class="sourceCode" id="cb11"><pre class="sourceCode default code-with-copy"><code class="sourceCode default"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a>%WITHIN%</span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a>  s | y ON x;        ! random slope of y on x (a within-person effect)</span>
+<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a>%BETWEEN%</span>
+<span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a>  y s ON w x;        ! between-level regressions of y and of the slope s</span>
+<span id="cb11-5"><a href="#cb11-5" aria-hidden="true" tabindex="-1"></a>  y WITH s;</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<p>The key feature is the <strong>random slope</strong> <code>s | y ON x</code>: the effect of <code>x</code> on <code>y</code> <em>within</em> clusters is allowed to vary <em>between</em> clusters. Its intercept is the average within-person slope – a between-person summary of a within-person effect.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb12"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a>m_ml <span class="ot">&lt;-</span> <span class="fu">readModels</span>(<span class="fu">mplus_file</span>(<span class="st">"ex9.2c.out"</span>), <span class="at">quiet =</span> <span class="cn">TRUE</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<section id="coef_wrapper-annotates-the-multilevel-structure" class="level2">
+<h2 class="anchored" data-anchor-id="coef_wrapper-annotates-the-multilevel-structure"><code>coef_wrapper()</code> annotates the multilevel structure</h2>
+<p>For two-level models <code>coef_wrapper()</code> adds several annotation columns. Here we request <code>regression</code>, <code>expectation</code> and <code>variability</code> parameters so that intercepts/means and the random-slope variance are all included:</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb13"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a><span class="fu">coef_wrapper</span>(m_ml, <span class="at">params =</span> <span class="fu">c</span>(<span class="st">"regression"</span>, <span class="st">"expectation"</span>, <span class="st">"variability"</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div data-pagedtable="false">
+  <script data-pagedtable-source="" type="application/json">
+{"columns":[{"label":["Label"],"name":[1],"type":["chr"],"align":["left"]},{"label":["est"],"name":[2],"type":["dbl"],"align":["right"]},{"label":["se"],"name":[3],"type":["dbl"],"align":["right"]},{"label":["pval"],"name":[4],"type":["dbl"],"align":["right"]},{"label":["level"],"name":[5],"type":["chr"],"align":["left"]},{"label":["DV"],"name":[6],"type":["chr"],"align":["left"]},{"label":["IV"],"name":[7],"type":["chr"],"align":["left"]},{"label":["random_slope"],"name":[8],"type":["lgl"],"align":["right"]},{"label":["within_avg_effect"],"name":[9],"type":["lgl"],"align":["right"]},{"label":["random_effect"],"name":[10],"type":["lgl"],"align":["right"]},{"label":["variance"],"name":[11],"type":["lgl"],"align":["right"]},{"label":["display_level"],"name":[12],"type":["chr"],"align":["left"]}],"data":[{"1":"S<-W","2":"0.569","3":"0.094","4":"0.00","5":"Between","6":"Y","7":"W","8":"TRUE","9":"FALSE","10":"TRUE","11":"FALSE","12":"Random effects"},{"1":"S<-X","2":"0.315","3":"0.180","4":"0.08","5":"Between","6":"Y","7":"X","8":"TRUE","9":"FALSE","10":"TRUE","11":"FALSE","12":"Random effects"},{"1":"Y<-W","2":"1.186","3":"0.113","4":"0.00","5":"Between","6":"Y","7":"W","8":"FALSE","9":"FALSE","10":"FALSE","11":"FALSE","12":"Between"},{"1":"Y<-X","2":"1.024","3":"0.217","4":"0.00","5":"Between","6":"Y","7":"X","8":"FALSE","9":"FALSE","10":"FALSE","11":"FALSE","12":"Between"},{"1":"Y<-Intercepts","2":"2.087","3":"0.083","4":"0.00","5":"Between","6":"Y","7":"Intercepts","8":"FALSE","9":"FALSE","10":"FALSE","11":"FALSE","12":"Between"},{"1":"S<-Intercepts","2":"1.017","3":"0.071","4":"0.00","5":"Between","6":"Y","7":"X","8":"TRUE","9":"TRUE","10":"FALSE","11":"FALSE","12":"Within"},{"1":"Y<->Y","2":"1.026","3":"0.052","4":"0.00","5":"Within","6":"Y","7":"Y","8":"FALSE","9":"FALSE","10":"FALSE","11":"TRUE","12":"Within"},{"1":"Y<->Y","2":"0.483","3":"0.098","4":"0.00","5":"Between","6":"Y","7":"Y","8":"FALSE","9":"FALSE","10":"FALSE","11":"TRUE","12":"Between"},{"1":"S<->S","2":"0.368","3":"0.056","4":"0.00","5":"Between","6":"Y","7":"Residual variance","8":"TRUE","9":"FALSE","10":"TRUE","11":"TRUE","12":"Random effects"}],"options":{"columns":{"min":{},"max":[10]},"rows":{"min":[10],"max":[10]},"pages":{}}}
+  </script>
+</div>
+</div>
+</div>
+<ul>
+<li><strong><code>level</code></strong> – the Mplus section the parameter belongs to (<code>Within</code> / <code>Between</code>).</li>
+<li><strong><code>random_slope</code></strong> – <code>TRUE</code> for any parameter that pertains to the random slope <code>S</code> (its mean, its predictors, or its variance).</li>
+<li><strong><code>within_avg_effect</code></strong> – <code>TRUE</code> for the mean/intercept of a random slope, i.e.&nbsp;a between-person mean of a within-person effect.</li>
+<li><strong><code>random_effect</code></strong> – <code>TRUE</code> for the slope’s <em>other</em> parameters: its cross-level predictors and its (residual) variance.</li>
+<li><strong><code>variance</code></strong> – <code>TRUE</code> for (residual) variance parameters.</li>
+<li><strong><code>display_level</code></strong> – the table section the row belongs to: <code>Within</code>, <code>Between</code>, or <code>Random effects</code>.</li>
+</ul>
+<p><code>coef_wrapper()</code> re-expresses each slope parameter in terms of the within-person relationship the slope captures (<code>s | y ON x</code>):</p>
+<ul>
+<li>the <strong>mean</strong> of <code>S</code> (1.017) becomes the average within-person effect of <code>x</code> on <code>y</code>, so it is reported with <code>DV = "Y"</code>, <code>IV = "X"</code> and <code>display_level = "Within"</code>;</li>
+<li>the <strong>cross-level regressions</strong> <code>S ON W</code> and <code>S ON X</code> describe how the slope varies across clusters; they move to <code>display_level = "Random effects"</code> and are reported under the slope’s outcome (<code>DV = "Y"</code>), keeping the between predictor;</li>
+<li>the slope’s <strong>(residual) variance</strong> also moves to <code>Random effects</code>, labelled <code>IV = "Residual variance"</code>.</li>
+</ul>
+<p>Variances that do not belong to a random slope (here the residual variances of <code>Y</code>) are kept by <code>coef_wrapper()</code> but omitted from the table below.</p>
+</section>
+<section id="coef_table_mplus-builds-a-three-section-table" class="level2">
+<h2 class="anchored" data-anchor-id="coef_table_mplus-builds-a-three-section-table"><code>coef_table_mplus()</code> builds a three-section table</h2>
+<p>The table now has up to three sections:</p>
+<ul>
+<li><strong>Within</strong> – within-person effects. The within-person effect of <code>X</code> on <code>Y</code> (the random-slope mean) appears as predictor <code>X</code> under outcome <code>Y</code>, marked with a superscript letter (the APA convention for a <em>specific note</em>; the dagger is avoided because APA reserves it for marginal significance).</li>
+<li><strong>Between</strong> – between-person effects on the real outcome <code>Y</code>. Note that the <em>between-person</em> effect of <code>X</code> on <code>Y</code> (1.024) is a separate, fixed coefficient, kept clearly apart from its <em>within-person</em> counterpart (1.017) – the classic within/between decomposition.</li>
+<li><strong>Random effects</strong> – the remaining parameters of the random slope <code>S</code>: its between-level predictors <code>W</code> and <code>X</code> (cross-level interactions) and its residual variance. These appear under the <code>Y</code> column instead of giving the latent slope <code>S</code> its own outcome column.</li>
+</ul>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb14"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a><span class="fu">coef_table_mplus</span>(m_ml)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div id="ybmeurzhql" style="padding-left:0px;padding-right:0px;padding-top:10px;padding-bottom:10px;overflow-x:auto;overflow-y:auto;width:auto;height:auto;">
+<style>#ybmeurzhql table {
+  font-family: system-ui, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#ybmeurzhql thead, #ybmeurzhql tbody, #ybmeurzhql tfoot, #ybmeurzhql tr, #ybmeurzhql td, #ybmeurzhql th {
+  border-style: none;
+}
+
+#ybmeurzhql p {
+  margin: 0;
+  padding: 0;
+}
+
+#ybmeurzhql .gt_table {
+  display: table;
+  border-collapse: collapse;
+  line-height: normal;
+  margin-left: auto;
+  margin-right: auto;
+  color: #333333;
+  font-size: 16px;
+  font-weight: normal;
+  font-style: normal;
+  background-color: #FFFFFF;
+  width: auto;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #A8A8A8;
+  border-right-style: none;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #A8A8A8;
+  border-left-style: none;
+  border-left-width: 2px;
+  border-left-color: #D3D3D3;
+}
+
+#ybmeurzhql .gt_caption {
+  padding-top: 4px;
+  padding-bottom: 4px;
+}
+
+#ybmeurzhql .gt_title {
+  color: #333333;
+  font-size: 125%;
+  font-weight: initial;
+  padding-top: 4px;
+  padding-bottom: 4px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-bottom-color: #FFFFFF;
+  border-bottom-width: 0;
+}
+
+#ybmeurzhql .gt_subtitle {
+  color: #333333;
+  font-size: 85%;
+  font-weight: initial;
+  padding-top: 3px;
+  padding-bottom: 5px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-top-color: #FFFFFF;
+  border-top-width: 0;
+}
+
+#ybmeurzhql .gt_heading {
+  background-color: #FFFFFF;
+  text-align: center;
+  border-bottom-color: #FFFFFF;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+}
+
+#ybmeurzhql .gt_bottom_border {
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+}
+
+#ybmeurzhql .gt_col_headings {
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+}
+
+#ybmeurzhql .gt_col_heading {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: normal;
+  text-transform: inherit;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+  vertical-align: bottom;
+  padding-top: 5px;
+  padding-bottom: 6px;
+  padding-left: 5px;
+  padding-right: 5px;
+  overflow-x: hidden;
+}
+
+#ybmeurzhql .gt_column_spanner_outer {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: normal;
+  text-transform: inherit;
+  padding-top: 0;
+  padding-bottom: 0;
+  padding-left: 4px;
+  padding-right: 4px;
+}
+
+#ybmeurzhql .gt_column_spanner_outer:first-child {
+  padding-left: 0;
+}
+
+#ybmeurzhql .gt_column_spanner_outer:last-child {
+  padding-right: 0;
+}
+
+#ybmeurzhql .gt_column_spanner {
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  vertical-align: bottom;
+  padding-top: 5px;
+  padding-bottom: 5px;
+  overflow-x: hidden;
+  display: inline-block;
+  width: 100%;
+}
+
+#ybmeurzhql .gt_spanner_row {
+  border-bottom-style: hidden;
+}
+
+#ybmeurzhql .gt_group_heading {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  text-transform: inherit;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+  vertical-align: middle;
+  text-align: left;
+}
+
+#ybmeurzhql .gt_empty_group_heading {
+  padding: 0.5px;
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  vertical-align: middle;
+}
+
+#ybmeurzhql .gt_from_md > :first-child {
+  margin-top: 0;
+}
+
+#ybmeurzhql .gt_from_md > :last-child {
+  margin-bottom: 0;
+}
+
+#ybmeurzhql .gt_row {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  margin: 10px;
+  border-top-style: solid;
+  border-top-width: 1px;
+  border-top-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+  vertical-align: middle;
+  overflow-x: hidden;
+}
+
+#ybmeurzhql .gt_stub {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  text-transform: inherit;
+  border-right-style: solid;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#ybmeurzhql .gt_stub_row_group {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  text-transform: inherit;
+  border-right-style: solid;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+  padding-left: 5px;
+  padding-right: 5px;
+  vertical-align: top;
+}
+
+#ybmeurzhql .gt_row_group_first td {
+  border-top-width: 2px;
+}
+
+#ybmeurzhql .gt_row_group_first th {
+  border-top-width: 2px;
+}
+
+#ybmeurzhql .gt_summary_row {
+  color: #333333;
+  background-color: #FFFFFF;
+  text-transform: inherit;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#ybmeurzhql .gt_first_summary_row {
+  border-top-style: solid;
+  border-top-color: #D3D3D3;
+}
+
+#ybmeurzhql .gt_first_summary_row.thick {
+  border-top-width: 2px;
+}
+
+#ybmeurzhql .gt_last_summary_row {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+}
+
+#ybmeurzhql .gt_grand_summary_row {
+  color: #333333;
+  background-color: #FFFFFF;
+  text-transform: inherit;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#ybmeurzhql .gt_first_grand_summary_row {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-top-style: double;
+  border-top-width: 6px;
+  border-top-color: #D3D3D3;
+}
+
+#ybmeurzhql .gt_last_grand_summary_row_top {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-bottom-style: double;
+  border-bottom-width: 6px;
+  border-bottom-color: #D3D3D3;
+}
+
+#ybmeurzhql .gt_striped {
+  background-color: rgba(128, 128, 128, 0.05);
+}
+
+#ybmeurzhql .gt_table_body {
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+}
+
+#ybmeurzhql .gt_footnotes {
+  color: #333333;
+  background-color: #FFFFFF;
+  border-bottom-style: none;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 2px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+}
+
+#ybmeurzhql .gt_footnote {
+  margin: 0px;
+  font-size: 90%;
+  padding-top: 4px;
+  padding-bottom: 4px;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#ybmeurzhql .gt_sourcenotes {
+  color: #333333;
+  background-color: #FFFFFF;
+  border-bottom-style: none;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 2px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+}
+
+#ybmeurzhql .gt_sourcenote {
+  font-size: 90%;
+  padding-top: 4px;
+  padding-bottom: 4px;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#ybmeurzhql .gt_left {
+  text-align: left;
+}
+
+#ybmeurzhql .gt_center {
+  text-align: center;
+}
+
+#ybmeurzhql .gt_right {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+#ybmeurzhql .gt_font_normal {
+  font-weight: normal;
+}
+
+#ybmeurzhql .gt_font_bold {
+  font-weight: bold;
+}
+
+#ybmeurzhql .gt_font_italic {
+  font-style: italic;
+}
+
+#ybmeurzhql .gt_super {
+  font-size: 65%;
+}
+
+#ybmeurzhql .gt_footnote_marks {
+  font-size: 75%;
+  vertical-align: 0.4em;
+  position: initial;
+}
+
+#ybmeurzhql .gt_asterisk {
+  font-size: 100%;
+  vertical-align: 0;
+}
+
+#ybmeurzhql .gt_indent_1 {
+  text-indent: 5px;
+}
+
+#ybmeurzhql .gt_indent_2 {
+  text-indent: 10px;
+}
+
+#ybmeurzhql .gt_indent_3 {
+  text-indent: 15px;
+}
+
+#ybmeurzhql .gt_indent_4 {
+  text-indent: 20px;
+}
+
+#ybmeurzhql .gt_indent_5 {
+  text-indent: 25px;
+}
+
+#ybmeurzhql .katex-display {
+  display: inline-flex !important;
+  margin-bottom: 0.75em !important;
+}
+
+#ybmeurzhql div.Reactable > div.rt-table > div.rt-thead > div.rt-tr.rt-tr-group-header > div.rt-th-group:after {
+  height: 0px !important;
+}
+</style>
+
+<table class="gt_table caption-top table table-sm table-striped small" data-quarto-postprocess="true" data-quarto-disable-processing="false" data-quarto-bootstrap="false">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="gt_col_headings gt_spanner_row header">
+<th rowspan="2" id="IV" class="gt_col_heading gt_columns_bottom_border gt_left" data-quarto-table-cell-role="th" scope="col">Predictor</th>
+<th colspan="2" id="Y" class="gt_center gt_columns_top_border gt_column_spanner_outer" data-quarto-table-cell-role="th" scope="colgroup"><div class="gt_column_spanner">
+Y
+</div></th>
+</tr>
+<tr class="gt_col_headings even">
+<th id="est_col__Y" class="gt_col_heading gt_columns_bottom_border gt_left" data-quarto-table-cell-role="th" scope="col">Est.</th>
+<th id="se_col__Y" class="gt_col_heading gt_columns_bottom_border gt_right" data-quarto-table-cell-role="th" scope="col">SE</th>
+</tr>
+</thead>
+<tbody class="gt_table_body">
+<tr class="gt_group_heading_row odd">
+<td colspan="3" id="Within" class="gt_group_heading" data-quarto-table-cell-role="th" scope="colgroup">Within</td>
+</tr>
+<tr class="gt_row_group_first even">
+<td class="gt_row gt_left" headers="Within  IV">X</td>
+<td class="gt_row gt_left" headers="Within  est_col__Y">1.017*ᵃ</td>
+<td class="gt_row gt_right" headers="Within  se_col__Y">0.071</td>
+</tr>
+<tr class="gt_group_heading_row odd">
+<td colspan="3" id="Between" class="gt_group_heading" data-quarto-table-cell-role="th" scope="colgroup">Between</td>
+</tr>
+<tr class="gt_row_group_first even">
+<td class="gt_row gt_left" headers="Between  IV">W</td>
+<td class="gt_row gt_left" headers="Between  est_col__Y">1.186*</td>
+<td class="gt_row gt_right" headers="Between  se_col__Y">0.113</td>
+</tr>
+<tr class="odd">
+<td class="gt_row gt_left" headers="Between  IV">X</td>
+<td class="gt_row gt_left" headers="Between  est_col__Y">1.024*</td>
+<td class="gt_row gt_right" headers="Between  se_col__Y">0.217</td>
+</tr>
+<tr class="even">
+<td class="gt_row gt_left" headers="Between  IV">Intercepts</td>
+<td class="gt_row gt_left" headers="Between  est_col__Y">2.087*</td>
+<td class="gt_row gt_right" headers="Between  se_col__Y">0.083</td>
+</tr>
+<tr class="gt_group_heading_row odd">
+<td colspan="3" id="Random effects" class="gt_group_heading" data-quarto-table-cell-role="th" scope="colgroup">Random effects</td>
+</tr>
+<tr class="gt_row_group_first even">
+<td class="gt_row gt_left" headers="Random effects  IV">W</td>
+<td class="gt_row gt_left" headers="Random effects  est_col__Y">0.569*</td>
+<td class="gt_row gt_right" headers="Random effects  se_col__Y">0.094</td>
+</tr>
+<tr class="odd">
+<td class="gt_row gt_left" headers="Random effects  IV">X</td>
+<td class="gt_row gt_left" headers="Random effects  est_col__Y">0.315</td>
+<td class="gt_row gt_right" headers="Random effects  se_col__Y">0.180</td>
+</tr>
+<tr class="even">
+<td class="gt_row gt_left" headers="Random effects  IV">Residual variance</td>
+<td class="gt_row gt_left" headers="Random effects  est_col__Y">0.368*</td>
+<td class="gt_row gt_right" headers="Random effects  se_col__Y">0.056</td>
+</tr>
+</tbody><tfoot>
+<tr class="gt_footnotes odd">
+<td colspan="3" class="gt_footnote">* p &lt; 0.05</td>
+</tr>
+<tr class="gt_footnotes even">
+<td colspan="3" class="gt_footnote">ᵃ Random-slope mean/intercept: the between-person mean of a within-person effect (shown in the Within section under the predictor it represents). All other coefficients are fixed effects.</td>
+</tr>
+<tr class="gt_footnotes odd">
+<td colspan="3" class="gt_footnote">Random effects: between-level predictors of the random slope (cross-level interactions) and its (residual) variance. Random slope(s): y on x.</td>
+</tr>
+</tfoot>
+
+</table>
+
+</div>
+</div>
+</div>
+<p>Use <code>label_replace</code> to give the outcomes and predictors more descriptive names (slope parameters follow their remapped predictor/outcome, so renaming <code>X</code> and <code>Y</code> is enough):</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb15"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a><span class="fu">coef_table_mplus</span>(</span>
+<span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a>  m_ml,</span>
+<span id="cb15-3"><a href="#cb15-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">label_replace =</span> <span class="fu">c</span>(<span class="st">"Y"</span> <span class="ot">=</span> <span class="st">"Outcome Y"</span>, <span class="st">"X"</span> <span class="ot">=</span> <span class="st">"Predictor X"</span>, <span class="st">"W"</span> <span class="ot">=</span> <span class="st">"Cluster W"</span>)</span>
+<span id="cb15-4"><a href="#cb15-4" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div id="bforkbumpa" style="padding-left:0px;padding-right:0px;padding-top:10px;padding-bottom:10px;overflow-x:auto;overflow-y:auto;width:auto;height:auto;">
+<style>#bforkbumpa table {
+  font-family: system-ui, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#bforkbumpa thead, #bforkbumpa tbody, #bforkbumpa tfoot, #bforkbumpa tr, #bforkbumpa td, #bforkbumpa th {
+  border-style: none;
+}
+
+#bforkbumpa p {
+  margin: 0;
+  padding: 0;
+}
+
+#bforkbumpa .gt_table {
+  display: table;
+  border-collapse: collapse;
+  line-height: normal;
+  margin-left: auto;
+  margin-right: auto;
+  color: #333333;
+  font-size: 16px;
+  font-weight: normal;
+  font-style: normal;
+  background-color: #FFFFFF;
+  width: auto;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #A8A8A8;
+  border-right-style: none;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #A8A8A8;
+  border-left-style: none;
+  border-left-width: 2px;
+  border-left-color: #D3D3D3;
+}
+
+#bforkbumpa .gt_caption {
+  padding-top: 4px;
+  padding-bottom: 4px;
+}
+
+#bforkbumpa .gt_title {
+  color: #333333;
+  font-size: 125%;
+  font-weight: initial;
+  padding-top: 4px;
+  padding-bottom: 4px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-bottom-color: #FFFFFF;
+  border-bottom-width: 0;
+}
+
+#bforkbumpa .gt_subtitle {
+  color: #333333;
+  font-size: 85%;
+  font-weight: initial;
+  padding-top: 3px;
+  padding-bottom: 5px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-top-color: #FFFFFF;
+  border-top-width: 0;
+}
+
+#bforkbumpa .gt_heading {
+  background-color: #FFFFFF;
+  text-align: center;
+  border-bottom-color: #FFFFFF;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+}
+
+#bforkbumpa .gt_bottom_border {
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+}
+
+#bforkbumpa .gt_col_headings {
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+}
+
+#bforkbumpa .gt_col_heading {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: normal;
+  text-transform: inherit;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+  vertical-align: bottom;
+  padding-top: 5px;
+  padding-bottom: 6px;
+  padding-left: 5px;
+  padding-right: 5px;
+  overflow-x: hidden;
+}
+
+#bforkbumpa .gt_column_spanner_outer {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: normal;
+  text-transform: inherit;
+  padding-top: 0;
+  padding-bottom: 0;
+  padding-left: 4px;
+  padding-right: 4px;
+}
+
+#bforkbumpa .gt_column_spanner_outer:first-child {
+  padding-left: 0;
+}
+
+#bforkbumpa .gt_column_spanner_outer:last-child {
+  padding-right: 0;
+}
+
+#bforkbumpa .gt_column_spanner {
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  vertical-align: bottom;
+  padding-top: 5px;
+  padding-bottom: 5px;
+  overflow-x: hidden;
+  display: inline-block;
+  width: 100%;
+}
+
+#bforkbumpa .gt_spanner_row {
+  border-bottom-style: hidden;
+}
+
+#bforkbumpa .gt_group_heading {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  text-transform: inherit;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+  vertical-align: middle;
+  text-align: left;
+}
+
+#bforkbumpa .gt_empty_group_heading {
+  padding: 0.5px;
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  vertical-align: middle;
+}
+
+#bforkbumpa .gt_from_md > :first-child {
+  margin-top: 0;
+}
+
+#bforkbumpa .gt_from_md > :last-child {
+  margin-bottom: 0;
+}
+
+#bforkbumpa .gt_row {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  margin: 10px;
+  border-top-style: solid;
+  border-top-width: 1px;
+  border-top-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+  vertical-align: middle;
+  overflow-x: hidden;
+}
+
+#bforkbumpa .gt_stub {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  text-transform: inherit;
+  border-right-style: solid;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#bforkbumpa .gt_stub_row_group {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  text-transform: inherit;
+  border-right-style: solid;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+  padding-left: 5px;
+  padding-right: 5px;
+  vertical-align: top;
+}
+
+#bforkbumpa .gt_row_group_first td {
+  border-top-width: 2px;
+}
+
+#bforkbumpa .gt_row_group_first th {
+  border-top-width: 2px;
+}
+
+#bforkbumpa .gt_summary_row {
+  color: #333333;
+  background-color: #FFFFFF;
+  text-transform: inherit;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#bforkbumpa .gt_first_summary_row {
+  border-top-style: solid;
+  border-top-color: #D3D3D3;
+}
+
+#bforkbumpa .gt_first_summary_row.thick {
+  border-top-width: 2px;
+}
+
+#bforkbumpa .gt_last_summary_row {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+}
+
+#bforkbumpa .gt_grand_summary_row {
+  color: #333333;
+  background-color: #FFFFFF;
+  text-transform: inherit;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#bforkbumpa .gt_first_grand_summary_row {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-top-style: double;
+  border-top-width: 6px;
+  border-top-color: #D3D3D3;
+}
+
+#bforkbumpa .gt_last_grand_summary_row_top {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-bottom-style: double;
+  border-bottom-width: 6px;
+  border-bottom-color: #D3D3D3;
+}
+
+#bforkbumpa .gt_striped {
+  background-color: rgba(128, 128, 128, 0.05);
+}
+
+#bforkbumpa .gt_table_body {
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+}
+
+#bforkbumpa .gt_footnotes {
+  color: #333333;
+  background-color: #FFFFFF;
+  border-bottom-style: none;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 2px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+}
+
+#bforkbumpa .gt_footnote {
+  margin: 0px;
+  font-size: 90%;
+  padding-top: 4px;
+  padding-bottom: 4px;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#bforkbumpa .gt_sourcenotes {
+  color: #333333;
+  background-color: #FFFFFF;
+  border-bottom-style: none;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 2px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+}
+
+#bforkbumpa .gt_sourcenote {
+  font-size: 90%;
+  padding-top: 4px;
+  padding-bottom: 4px;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#bforkbumpa .gt_left {
+  text-align: left;
+}
+
+#bforkbumpa .gt_center {
+  text-align: center;
+}
+
+#bforkbumpa .gt_right {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+#bforkbumpa .gt_font_normal {
+  font-weight: normal;
+}
+
+#bforkbumpa .gt_font_bold {
+  font-weight: bold;
+}
+
+#bforkbumpa .gt_font_italic {
+  font-style: italic;
+}
+
+#bforkbumpa .gt_super {
+  font-size: 65%;
+}
+
+#bforkbumpa .gt_footnote_marks {
+  font-size: 75%;
+  vertical-align: 0.4em;
+  position: initial;
+}
+
+#bforkbumpa .gt_asterisk {
+  font-size: 100%;
+  vertical-align: 0;
+}
+
+#bforkbumpa .gt_indent_1 {
+  text-indent: 5px;
+}
+
+#bforkbumpa .gt_indent_2 {
+  text-indent: 10px;
+}
+
+#bforkbumpa .gt_indent_3 {
+  text-indent: 15px;
+}
+
+#bforkbumpa .gt_indent_4 {
+  text-indent: 20px;
+}
+
+#bforkbumpa .gt_indent_5 {
+  text-indent: 25px;
+}
+
+#bforkbumpa .katex-display {
+  display: inline-flex !important;
+  margin-bottom: 0.75em !important;
+}
+
+#bforkbumpa div.Reactable > div.rt-table > div.rt-thead > div.rt-tr.rt-tr-group-header > div.rt-th-group:after {
+  height: 0px !important;
+}
+</style>
+
+<table class="gt_table caption-top table table-sm table-striped small" data-quarto-postprocess="true" data-quarto-disable-processing="false" data-quarto-bootstrap="false">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="gt_col_headings gt_spanner_row header">
+<th rowspan="2" id="IV" class="gt_col_heading gt_columns_bottom_border gt_left" data-quarto-table-cell-role="th" scope="col">Predictor</th>
+<th colspan="2" id="Outcome Y" class="gt_center gt_columns_top_border gt_column_spanner_outer" data-quarto-table-cell-role="th" scope="colgroup"><div class="gt_column_spanner">
+Outcome Y
+</div></th>
+</tr>
+<tr class="gt_col_headings even">
+<th id="est_col__Outcome-Y" class="gt_col_heading gt_columns_bottom_border gt_left" data-quarto-table-cell-role="th" scope="col">Est.</th>
+<th id="se_col__Outcome-Y" class="gt_col_heading gt_columns_bottom_border gt_right" data-quarto-table-cell-role="th" scope="col">SE</th>
+</tr>
+</thead>
+<tbody class="gt_table_body">
+<tr class="gt_group_heading_row odd">
+<td colspan="3" id="Within" class="gt_group_heading" data-quarto-table-cell-role="th" scope="colgroup">Within</td>
+</tr>
+<tr class="gt_row_group_first even">
+<td class="gt_row gt_left" headers="Within  IV">Predictor X</td>
+<td class="gt_row gt_left" headers="Within  est_col__Outcome Y">1.017*ᵃ</td>
+<td class="gt_row gt_right" headers="Within  se_col__Outcome Y">0.071</td>
+</tr>
+<tr class="gt_group_heading_row odd">
+<td colspan="3" id="Between" class="gt_group_heading" data-quarto-table-cell-role="th" scope="colgroup">Between</td>
+</tr>
+<tr class="gt_row_group_first even">
+<td class="gt_row gt_left" headers="Between  IV">Cluster W</td>
+<td class="gt_row gt_left" headers="Between  est_col__Outcome Y">1.186*</td>
+<td class="gt_row gt_right" headers="Between  se_col__Outcome Y">0.113</td>
+</tr>
+<tr class="odd">
+<td class="gt_row gt_left" headers="Between  IV">Predictor X</td>
+<td class="gt_row gt_left" headers="Between  est_col__Outcome Y">1.024*</td>
+<td class="gt_row gt_right" headers="Between  se_col__Outcome Y">0.217</td>
+</tr>
+<tr class="even">
+<td class="gt_row gt_left" headers="Between  IV">Intercepts</td>
+<td class="gt_row gt_left" headers="Between  est_col__Outcome Y">2.087*</td>
+<td class="gt_row gt_right" headers="Between  se_col__Outcome Y">0.083</td>
+</tr>
+<tr class="gt_group_heading_row odd">
+<td colspan="3" id="Random effects" class="gt_group_heading" data-quarto-table-cell-role="th" scope="colgroup">Random effects</td>
+</tr>
+<tr class="gt_row_group_first even">
+<td class="gt_row gt_left" headers="Random effects  IV">Cluster W</td>
+<td class="gt_row gt_left" headers="Random effects  est_col__Outcome Y">0.569*</td>
+<td class="gt_row gt_right" headers="Random effects  se_col__Outcome Y">0.094</td>
+</tr>
+<tr class="odd">
+<td class="gt_row gt_left" headers="Random effects  IV">Predictor X</td>
+<td class="gt_row gt_left" headers="Random effects  est_col__Outcome Y">0.315</td>
+<td class="gt_row gt_right" headers="Random effects  se_col__Outcome Y">0.180</td>
+</tr>
+<tr class="even">
+<td class="gt_row gt_left" headers="Random effects  IV">Residual variance</td>
+<td class="gt_row gt_left" headers="Random effects  est_col__Outcome Y">0.368*</td>
+<td class="gt_row gt_right" headers="Random effects  se_col__Outcome Y">0.056</td>
+</tr>
+</tbody><tfoot>
+<tr class="gt_footnotes odd">
+<td colspan="3" class="gt_footnote">* p &lt; 0.05</td>
+</tr>
+<tr class="gt_footnotes even">
+<td colspan="3" class="gt_footnote">ᵃ Random-slope mean/intercept: the between-person mean of a within-person effect (shown in the Within section under the predictor it represents). All other coefficients are fixed effects.</td>
+</tr>
+<tr class="gt_footnotes odd">
+<td colspan="3" class="gt_footnote">Random effects: between-level predictors of the random slope (cross-level interactions) and its (residual) variance. Random slope(s): y on x.</td>
+</tr>
+</tfoot>
+
+</table>
+
+</div>
+</div>
+</div>
+<p>When the package is rendering to a plain tibble (no <code>gt</code> installed), the section is carried in a leading <code>level</code> column instead of a row group, so the section structure is never lost.</p>
+</section>
+<section id="two-level-bayesian-model" class="level2">
+<h2 class="anchored" data-anchor-id="two-level-bayesian-model">Two-level Bayesian model</h2>
+<p>The Bayesian variant <code>ex9.2c_BAYES</code> defaults to a credibility-interval display. The random-slope mean is again remapped to its within predictor and placed in the Within section.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb16"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a>m_ml_bayes <span class="ot">&lt;-</span> <span class="fu">readModels</span>(<span class="fu">mplus_file</span>(<span class="st">"ex9.2c_BAYES.out"</span>), <span class="at">quiet =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a><span class="fu">coef_table_mplus</span>(m_ml_bayes)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stderr">
+<pre><code>Bayesian estimator detected: p-values in this output are one-tailed.</code></pre>
+</div>
+<div class="cell-output-display">
+<div id="drnkvsbulw" style="padding-left:0px;padding-right:0px;padding-top:10px;padding-bottom:10px;overflow-x:auto;overflow-y:auto;width:auto;height:auto;">
+<style>#drnkvsbulw table {
+  font-family: system-ui, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#drnkvsbulw thead, #drnkvsbulw tbody, #drnkvsbulw tfoot, #drnkvsbulw tr, #drnkvsbulw td, #drnkvsbulw th {
+  border-style: none;
+}
+
+#drnkvsbulw p {
+  margin: 0;
+  padding: 0;
+}
+
+#drnkvsbulw .gt_table {
+  display: table;
+  border-collapse: collapse;
+  line-height: normal;
+  margin-left: auto;
+  margin-right: auto;
+  color: #333333;
+  font-size: 16px;
+  font-weight: normal;
+  font-style: normal;
+  background-color: #FFFFFF;
+  width: auto;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #A8A8A8;
+  border-right-style: none;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #A8A8A8;
+  border-left-style: none;
+  border-left-width: 2px;
+  border-left-color: #D3D3D3;
+}
+
+#drnkvsbulw .gt_caption {
+  padding-top: 4px;
+  padding-bottom: 4px;
+}
+
+#drnkvsbulw .gt_title {
+  color: #333333;
+  font-size: 125%;
+  font-weight: initial;
+  padding-top: 4px;
+  padding-bottom: 4px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-bottom-color: #FFFFFF;
+  border-bottom-width: 0;
+}
+
+#drnkvsbulw .gt_subtitle {
+  color: #333333;
+  font-size: 85%;
+  font-weight: initial;
+  padding-top: 3px;
+  padding-bottom: 5px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-top-color: #FFFFFF;
+  border-top-width: 0;
+}
+
+#drnkvsbulw .gt_heading {
+  background-color: #FFFFFF;
+  text-align: center;
+  border-bottom-color: #FFFFFF;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+}
+
+#drnkvsbulw .gt_bottom_border {
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+}
+
+#drnkvsbulw .gt_col_headings {
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+}
+
+#drnkvsbulw .gt_col_heading {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: normal;
+  text-transform: inherit;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+  vertical-align: bottom;
+  padding-top: 5px;
+  padding-bottom: 6px;
+  padding-left: 5px;
+  padding-right: 5px;
+  overflow-x: hidden;
+}
+
+#drnkvsbulw .gt_column_spanner_outer {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: normal;
+  text-transform: inherit;
+  padding-top: 0;
+  padding-bottom: 0;
+  padding-left: 4px;
+  padding-right: 4px;
+}
+
+#drnkvsbulw .gt_column_spanner_outer:first-child {
+  padding-left: 0;
+}
+
+#drnkvsbulw .gt_column_spanner_outer:last-child {
+  padding-right: 0;
+}
+
+#drnkvsbulw .gt_column_spanner {
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  vertical-align: bottom;
+  padding-top: 5px;
+  padding-bottom: 5px;
+  overflow-x: hidden;
+  display: inline-block;
+  width: 100%;
+}
+
+#drnkvsbulw .gt_spanner_row {
+  border-bottom-style: hidden;
+}
+
+#drnkvsbulw .gt_group_heading {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  text-transform: inherit;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+  vertical-align: middle;
+  text-align: left;
+}
+
+#drnkvsbulw .gt_empty_group_heading {
+  padding: 0.5px;
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  vertical-align: middle;
+}
+
+#drnkvsbulw .gt_from_md > :first-child {
+  margin-top: 0;
+}
+
+#drnkvsbulw .gt_from_md > :last-child {
+  margin-bottom: 0;
+}
+
+#drnkvsbulw .gt_row {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  margin: 10px;
+  border-top-style: solid;
+  border-top-width: 1px;
+  border-top-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+  vertical-align: middle;
+  overflow-x: hidden;
+}
+
+#drnkvsbulw .gt_stub {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  text-transform: inherit;
+  border-right-style: solid;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#drnkvsbulw .gt_stub_row_group {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  text-transform: inherit;
+  border-right-style: solid;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+  padding-left: 5px;
+  padding-right: 5px;
+  vertical-align: top;
+}
+
+#drnkvsbulw .gt_row_group_first td {
+  border-top-width: 2px;
+}
+
+#drnkvsbulw .gt_row_group_first th {
+  border-top-width: 2px;
+}
+
+#drnkvsbulw .gt_summary_row {
+  color: #333333;
+  background-color: #FFFFFF;
+  text-transform: inherit;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#drnkvsbulw .gt_first_summary_row {
+  border-top-style: solid;
+  border-top-color: #D3D3D3;
+}
+
+#drnkvsbulw .gt_first_summary_row.thick {
+  border-top-width: 2px;
+}
+
+#drnkvsbulw .gt_last_summary_row {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+}
+
+#drnkvsbulw .gt_grand_summary_row {
+  color: #333333;
+  background-color: #FFFFFF;
+  text-transform: inherit;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#drnkvsbulw .gt_first_grand_summary_row {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-top-style: double;
+  border-top-width: 6px;
+  border-top-color: #D3D3D3;
+}
+
+#drnkvsbulw .gt_last_grand_summary_row_top {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-bottom-style: double;
+  border-bottom-width: 6px;
+  border-bottom-color: #D3D3D3;
+}
+
+#drnkvsbulw .gt_striped {
+  background-color: rgba(128, 128, 128, 0.05);
+}
+
+#drnkvsbulw .gt_table_body {
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+}
+
+#drnkvsbulw .gt_footnotes {
+  color: #333333;
+  background-color: #FFFFFF;
+  border-bottom-style: none;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 2px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+}
+
+#drnkvsbulw .gt_footnote {
+  margin: 0px;
+  font-size: 90%;
+  padding-top: 4px;
+  padding-bottom: 4px;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#drnkvsbulw .gt_sourcenotes {
+  color: #333333;
+  background-color: #FFFFFF;
+  border-bottom-style: none;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 2px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+}
+
+#drnkvsbulw .gt_sourcenote {
+  font-size: 90%;
+  padding-top: 4px;
+  padding-bottom: 4px;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#drnkvsbulw .gt_left {
+  text-align: left;
+}
+
+#drnkvsbulw .gt_center {
+  text-align: center;
+}
+
+#drnkvsbulw .gt_right {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+#drnkvsbulw .gt_font_normal {
+  font-weight: normal;
+}
+
+#drnkvsbulw .gt_font_bold {
+  font-weight: bold;
+}
+
+#drnkvsbulw .gt_font_italic {
+  font-style: italic;
+}
+
+#drnkvsbulw .gt_super {
+  font-size: 65%;
+}
+
+#drnkvsbulw .gt_footnote_marks {
+  font-size: 75%;
+  vertical-align: 0.4em;
+  position: initial;
+}
+
+#drnkvsbulw .gt_asterisk {
+  font-size: 100%;
+  vertical-align: 0;
+}
+
+#drnkvsbulw .gt_indent_1 {
+  text-indent: 5px;
+}
+
+#drnkvsbulw .gt_indent_2 {
+  text-indent: 10px;
+}
+
+#drnkvsbulw .gt_indent_3 {
+  text-indent: 15px;
+}
+
+#drnkvsbulw .gt_indent_4 {
+  text-indent: 20px;
+}
+
+#drnkvsbulw .gt_indent_5 {
+  text-indent: 25px;
+}
+
+#drnkvsbulw .katex-display {
+  display: inline-flex !important;
+  margin-bottom: 0.75em !important;
+}
+
+#drnkvsbulw div.Reactable > div.rt-table > div.rt-thead > div.rt-tr.rt-tr-group-header > div.rt-th-group:after {
+  height: 0px !important;
+}
+</style>
+
+<table class="gt_table caption-top table table-sm table-striped small" data-quarto-postprocess="true" data-quarto-disable-processing="false" data-quarto-bootstrap="false">
+<colgroup>
+<col style="width: 14%">
+<col style="width: 14%">
+<col style="width: 14%">
+<col style="width: 14%">
+<col style="width: 14%">
+<col style="width: 14%">
+<col style="width: 14%">
+</colgroup>
+<thead>
+<tr class="gt_col_headings gt_spanner_row header">
+<th rowspan="2" id="IV" class="gt_col_heading gt_columns_bottom_border gt_left" data-quarto-table-cell-role="th" scope="col">Predictor</th>
+<th colspan="3" id="Y" class="gt_center gt_columns_top_border gt_column_spanner_outer" data-quarto-table-cell-role="th" scope="colgroup"><div class="gt_column_spanner">
+Y
+</div></th>
+<th colspan="3" id="X" class="gt_center gt_columns_top_border gt_column_spanner_outer" data-quarto-table-cell-role="th" scope="colgroup"><div class="gt_column_spanner">
+X
+</div></th>
+</tr>
+<tr class="gt_col_headings even">
+<th id="est_col__Y" class="gt_col_heading gt_columns_bottom_border gt_left" data-quarto-table-cell-role="th" scope="col">Est.</th>
+<th id="ll_col__Y" class="gt_col_heading gt_columns_bottom_border gt_right" data-quarto-table-cell-role="th" scope="col">LL</th>
+<th id="ul_col__Y" class="gt_col_heading gt_columns_bottom_border gt_right" data-quarto-table-cell-role="th" scope="col">UL</th>
+<th id="est_col__X" class="gt_col_heading gt_columns_bottom_border gt_right" data-quarto-table-cell-role="th" scope="col">Est.</th>
+<th id="ll_col__X" class="gt_col_heading gt_columns_bottom_border gt_right" data-quarto-table-cell-role="th" scope="col">LL</th>
+<th id="ul_col__X" class="gt_col_heading gt_columns_bottom_border gt_right" data-quarto-table-cell-role="th" scope="col">UL</th>
+</tr>
+</thead>
+<tbody class="gt_table_body">
+<tr class="gt_group_heading_row odd">
+<td colspan="7" id="Within" class="gt_group_heading" data-quarto-table-cell-role="th" scope="colgroup">Within</td>
+</tr>
+<tr class="gt_row_group_first even">
+<td class="gt_row gt_left" headers="Within  IV">X</td>
+<td class="gt_row gt_left" headers="Within  est_col__Y">1.017*ᵃ</td>
+<td class="gt_row gt_right" headers="Within  ll_col__Y">0.862</td>
+<td class="gt_row gt_right" headers="Within  ul_col__Y">1.166</td>
+<td class="gt_row gt_right" headers="Within  est_col__X">NA</td>
+<td class="gt_row gt_right" headers="Within  ll_col__X">NA</td>
+<td class="gt_row gt_right" headers="Within  ul_col__X">NA</td>
+</tr>
+<tr class="gt_group_heading_row odd">
+<td colspan="7" id="Between" class="gt_group_heading" data-quarto-table-cell-role="th" scope="colgroup">Between</td>
+</tr>
+<tr class="gt_row_group_first even">
+<td class="gt_row gt_left" headers="Between  IV">W</td>
+<td class="gt_row gt_left" headers="Between  est_col__Y">1.295*</td>
+<td class="gt_row gt_right" headers="Between  ll_col__Y">1.063</td>
+<td class="gt_row gt_right" headers="Between  ul_col__Y">1.520</td>
+<td class="gt_row gt_right" headers="Between  est_col__X">NA</td>
+<td class="gt_row gt_right" headers="Between  ll_col__X">NA</td>
+<td class="gt_row gt_right" headers="Between  ul_col__X">NA</td>
+</tr>
+<tr class="odd">
+<td class="gt_row gt_left" headers="Between  IV">X</td>
+<td class="gt_row gt_left" headers="Between  est_col__Y">1.669*</td>
+<td class="gt_row gt_right" headers="Between  ll_col__Y">1.226</td>
+<td class="gt_row gt_right" headers="Between  ul_col__Y">2.136</td>
+<td class="gt_row gt_right" headers="Between  est_col__X">NA</td>
+<td class="gt_row gt_right" headers="Between  ll_col__X">NA</td>
+<td class="gt_row gt_right" headers="Between  ul_col__X">NA</td>
+</tr>
+<tr class="even">
+<td class="gt_row gt_left" headers="Between  IV">Means</td>
+<td class="gt_row gt_left" headers="Between  est_col__Y">NA</td>
+<td class="gt_row gt_right" headers="Between  ll_col__Y">NA</td>
+<td class="gt_row gt_right" headers="Between  ul_col__Y">NA</td>
+<td class="gt_row gt_right" headers="Between  est_col__X">-0.081</td>
+<td class="gt_row gt_right" headers="Between  ll_col__X">-0.202</td>
+<td class="gt_row gt_right" headers="Between  ul_col__X">0.043</td>
+</tr>
+<tr class="odd">
+<td class="gt_row gt_left" headers="Between  IV">Intercepts</td>
+<td class="gt_row gt_left" headers="Between  est_col__Y">2.257*</td>
+<td class="gt_row gt_right" headers="Between  ll_col__Y">2.058</td>
+<td class="gt_row gt_right" headers="Between  ul_col__Y">2.450</td>
+<td class="gt_row gt_right" headers="Between  est_col__X">NA</td>
+<td class="gt_row gt_right" headers="Between  ll_col__X">NA</td>
+<td class="gt_row gt_right" headers="Between  ul_col__X">NA</td>
+</tr>
+<tr class="gt_group_heading_row even">
+<td colspan="7" id="Random effects" class="gt_group_heading" data-quarto-table-cell-role="th" scope="colgroup">Random effects</td>
+</tr>
+<tr class="gt_row_group_first odd">
+<td class="gt_row gt_left" headers="Random effects  IV">W</td>
+<td class="gt_row gt_left" headers="Random effects  est_col__Y">0.656*</td>
+<td class="gt_row gt_right" headers="Random effects  ll_col__Y">0.478</td>
+<td class="gt_row gt_right" headers="Random effects  ul_col__Y">0.841</td>
+<td class="gt_row gt_right" headers="Random effects  est_col__X">NA</td>
+<td class="gt_row gt_right" headers="Random effects  ll_col__X">NA</td>
+<td class="gt_row gt_right" headers="Random effects  ul_col__X">NA</td>
+</tr>
+<tr class="even">
+<td class="gt_row gt_left" headers="Random effects  IV">X</td>
+<td class="gt_row gt_left" headers="Random effects  est_col__Y">0.198</td>
+<td class="gt_row gt_right" headers="Random effects  ll_col__Y">-0.144</td>
+<td class="gt_row gt_right" headers="Random effects  ul_col__Y">0.565</td>
+<td class="gt_row gt_right" headers="Random effects  est_col__X">NA</td>
+<td class="gt_row gt_right" headers="Random effects  ll_col__X">NA</td>
+<td class="gt_row gt_right" headers="Random effects  ul_col__X">NA</td>
+</tr>
+<tr class="odd">
+<td class="gt_row gt_left" headers="Random effects  IV">Residual variance</td>
+<td class="gt_row gt_left" headers="Random effects  est_col__Y">0.442*</td>
+<td class="gt_row gt_right" headers="Random effects  ll_col__Y">0.303</td>
+<td class="gt_row gt_right" headers="Random effects  ul_col__Y">0.641</td>
+<td class="gt_row gt_right" headers="Random effects  est_col__X">NA</td>
+<td class="gt_row gt_right" headers="Random effects  ll_col__X">NA</td>
+<td class="gt_row gt_right" headers="Random effects  ul_col__X">NA</td>
+</tr>
+</tbody><tfoot>
+<tr class="gt_footnotes odd">
+<td colspan="7" class="gt_footnote">* 95% credibility interval excludes zero.</td>
+</tr>
+<tr class="gt_footnotes even">
+<td colspan="7" class="gt_footnote">ᵃ Random-slope mean/intercept: the between-person mean of a within-person effect (shown in the Within section under the predictor it represents). All other coefficients are fixed effects.</td>
+</tr>
+<tr class="gt_footnotes odd">
+<td colspan="7" class="gt_footnote">Random effects: between-level predictors of the random slope (cross-level interactions) and its (residual) variance. Random slope(s): y on x.</td>
+</tr>
+</tfoot>
+
+</table>
+
+</div>
+</div>
+</div>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Intervals without a CINTERVAL table
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p><code>coef_table_mplus()</code> (via an internal helper) first asks <code>MplusAutomation</code>’s <code>confint()</code> for intervals, which requires the Mplus <code>CINTERVAL</code> output. If that table is unavailable – common for Bayesian runs where the credibility limits are printed inline in <code>MODEL RESULTS</code> – the tools fall back to reconstructing the 95% interval from those inline columns, so <code>display_type = "est_ci"</code> keeps working. If no intervals can be found at all (e.g.&nbsp;a frequentist run without <code>CINTERVAL</code>), the table gracefully falls back to the estimate + SE display.</p>
+</div>
+</div>
+</section>
+</section>
+<section id="argument-quick-reference" class="level1">
+<h1>Argument quick reference</h1>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Argument</th>
+<th><code>coef_wrapper()</code></th>
+<th><code>coef_table_mplus()</code></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>params</code></td>
+<td>parameter types to extract (default <code>"regression"</code>)</td>
+<td>default <code>c("regression", "expectation")</code> for two-level, <code>"regression"</code> otherwise</td>
+</tr>
+<tr class="even">
+<td><code>type</code></td>
+<td>coefficient scale: <code>"un"</code>, <code>"stdyx"</code>, <code>"stdy"</code>, <code>"std"</code></td>
+<td>passed through to <code>coef_wrapper()</code></td>
+</tr>
+<tr class="odd">
+<td><code>bayes</code></td>
+<td><code>NULL</code> auto-detect, or force <code>TRUE</code>/<code>FALSE</code></td>
+<td>same</td>
+</tr>
+<tr class="even">
+<td><code>display_type</code></td>
+<td>–</td>
+<td><code>NULL</code> auto-detect, <code>"est_se"</code>, or <code>"est_ci"</code></td>
+</tr>
+<tr class="odd">
+<td><code>addci</code></td>
+<td>append <code>LowerCI</code>/<code>UpperCI</code></td>
+<td>(handled internally for <code>est_ci</code>)</td>
+</tr>
+<tr class="even">
+<td><code>label_replace</code></td>
+<td>rename DV/IV labels</td>
+<td>rename DV/IV labels</td>
+</tr>
+<tr class="odd">
+<td><code>na_replace</code></td>
+<td>–</td>
+<td>fill empty cells</td>
+</tr>
+<tr class="even">
+<td><code>sig_threshold</code>, <code>digits</code></td>
+<td>–</td>
+<td>star threshold / rounding</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="session-info" class="level1">
+<h1>Session info</h1>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb18"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a><span class="fu">sessionInfo</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>R version 4.6.0 (2026-04-24)
+Platform: aarch64-apple-darwin23
+Running under: macOS Tahoe 26.5
+
+Matrix products: default
+BLAS:   /Library/Frameworks/R.framework/Versions/4.6/Resources/lib/libRblas.0.dylib 
+LAPACK: /Library/Frameworks/R.framework/Versions/4.6/Resources/lib/libRlapack.dylib;  LAPACK version 3.12.1
+
+locale:
+[1] C
+
+time zone: Europe/Berlin
+tzcode source: internal
+
+attached base packages:
+[1] stats     graphics  grDevices utils     datasets  methods   base     
+
+other attached packages:
+[1] MplusAutomation_1.2 franzpak_0.3.2     
+
+loaded via a namespace (and not attached):
+ [1] gt_1.3.0            sass_0.4.10         generics_0.1.4     
+ [4] tidyr_1.3.2         xml2_1.5.2          stringi_1.8.7      
+ [7] lattice_0.22-9      digest_0.6.39       magrittr_2.0.5     
+[10] evaluate_1.0.5      grid_4.6.0          RColorBrewer_1.1-3 
+[13] fastmap_1.2.0       plyr_1.8.9          jsonlite_2.0.0     
+[16] processx_3.9.0      backports_1.5.1     httr_1.4.8         
+[19] purrr_1.2.2         pander_0.6.6        scales_1.4.0       
+[22] cli_3.6.6           rlang_1.2.0         texreg_1.39.5      
+[25] withr_3.0.2         gsubfn_0.7          yaml_2.3.12        
+[28] otel_0.2.0          tools_4.6.0         proto_1.0.0        
+[31] parallel_4.6.0      checkmate_2.3.4     coda_0.19-4.1      
+[34] dplyr_1.2.1         ggplot2_4.0.3       boot_1.3-32        
+[37] vctrs_0.7.3         fastDummies_1.7.6   R6_2.6.1           
+[40] lifecycle_1.0.5     stringr_1.6.0       fs_2.1.0           
+[43] htmlwidgets_1.6.4   pkgconfig_2.0.3     callr_3.7.6        
+[46] pillar_1.11.1       gtable_0.3.6        glue_1.8.1         
+[49] data.table_1.18.2.1 Rcpp_1.1.1-1.1      xfun_0.57          
+[52] tibble_3.3.1        tidyselect_1.2.1    knitr_1.51         
+[55] xtable_1.8-8        farver_2.1.2        htmltools_0.5.9    
+[58] rmarkdown_2.31      compiler_4.6.0      S7_0.2.2           </code></pre>
+</div>
+</div>
+</section>
+
+</main>
+<!-- /main column -->
+<script id="quarto-html-after-body" type="application/javascript">
+window.document.addEventListener("DOMContentLoaded", function (event) {
+  const toggleBodyColorMode = (bsSheetEl) => {
+    const mode = bsSheetEl.getAttribute("data-mode");
+    const bodyEl = window.document.querySelector("body");
+    if (mode === "dark") {
+      bodyEl.classList.add("quarto-dark");
+      bodyEl.classList.remove("quarto-light");
+    } else {
+      bodyEl.classList.add("quarto-light");
+      bodyEl.classList.remove("quarto-dark");
+    }
+  }
+  const toggleBodyColorPrimary = () => {
+    const bsSheetEl = window.document.querySelector("link#quarto-bootstrap");
+    if (bsSheetEl) {
+      toggleBodyColorMode(bsSheetEl);
+    }
+  }
+  toggleBodyColorPrimary();  
+  const icon = "";
+  const anchorJS = new window.AnchorJS();
+  anchorJS.options = {
+    placement: 'right',
+    icon: icon
+  };
+  anchorJS.add('.anchored');
+  const isCodeAnnotation = (el) => {
+    for (const clz of el.classList) {
+      if (clz.startsWith('code-annotation-')) {                     
+        return true;
+      }
+    }
+    return false;
+  }
+  const onCopySuccess = function(e) {
+    // button target
+    const button = e.trigger;
+    // don't keep focus
+    button.blur();
+    // flash "checked"
+    button.classList.add('code-copy-button-checked');
+    var currentTitle = button.getAttribute("title");
+    button.setAttribute("title", "Copied!");
+    let tooltip;
+    if (window.bootstrap) {
+      button.setAttribute("data-bs-toggle", "tooltip");
+      button.setAttribute("data-bs-placement", "left");
+      button.setAttribute("data-bs-title", "Copied!");
+      tooltip = new bootstrap.Tooltip(button, 
+        { trigger: "manual", 
+          customClass: "code-copy-button-tooltip",
+          offset: [0, -8]});
+      tooltip.show();    
+    }
+    setTimeout(function() {
+      if (tooltip) {
+        tooltip.hide();
+        button.removeAttribute("data-bs-title");
+        button.removeAttribute("data-bs-toggle");
+        button.removeAttribute("data-bs-placement");
+      }
+      button.setAttribute("title", currentTitle);
+      button.classList.remove('code-copy-button-checked');
+    }, 1000);
+    // clear code selection
+    e.clearSelection();
+  }
+  const getTextToCopy = function(trigger) {
+      const codeEl = trigger.previousElementSibling.cloneNode(true);
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+  }
+  const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+    text: getTextToCopy
+  });
+  clipboard.on('success', onCopySuccess);
+  if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+    const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+      text: getTextToCopy,
+      container: window.document.getElementById('quarto-embedded-source-code-modal')
+    });
+    clipboardModal.on('success', onCopySuccess);
+  }
+    var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+    var mailtoRegex = new RegExp(/^mailto:/);
+      var filterRegex = new RegExp('/' + window.location.host + '/');
+    var isInternal = (href) => {
+        return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+    }
+    // Inspect non-navigation links and adorn them if external
+ 	var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+    for (var i=0; i<links.length; i++) {
+      const link = links[i];
+      if (!isInternal(link.href)) {
+        // undo the damage that might have been done by quarto-nav.js in the case of
+        // links that we want to consider external
+        if (link.dataset.originalHref !== undefined) {
+          link.href = link.dataset.originalHref;
+        }
+      }
+    }
+  function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+    const config = {
+      allowHTML: true,
+      maxWidth: 500,
+      delay: 100,
+      arrow: false,
+      appendTo: function(el) {
+          return el.parentElement;
+      },
+      interactive: true,
+      interactiveBorder: 10,
+      theme: 'quarto',
+      placement: 'bottom-start',
+    };
+    if (contentFn) {
+      config.content = contentFn;
+    }
+    if (onTriggerFn) {
+      config.onTrigger = onTriggerFn;
+    }
+    if (onUntriggerFn) {
+      config.onUntrigger = onUntriggerFn;
+    }
+    window.tippy(el, config); 
+  }
+  const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+  for (var i=0; i<noterefs.length; i++) {
+    const ref = noterefs[i];
+    tippyHover(ref, function() {
+      // use id or data attribute instead here
+      let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+      try { href = new URL(href).hash; } catch {}
+      const id = href.replace(/^#\/?/, "");
+      const note = window.document.getElementById(id);
+      if (note) {
+        return note.innerHTML;
+      } else {
+        return "";
+      }
+    });
+  }
+  const xrefs = window.document.querySelectorAll('a.quarto-xref');
+  const processXRef = (id, note) => {
+    // Strip column container classes
+    const stripColumnClz = (el) => {
+      el.classList.remove("page-full", "page-columns");
+      if (el.children) {
+        for (const child of el.children) {
+          stripColumnClz(child);
+        }
+      }
+    }
+    stripColumnClz(note)
+    if (id === null || id.startsWith('sec-')) {
+      // Special case sections, only their first couple elements
+      const container = document.createElement("div");
+      if (note.children && note.children.length > 2) {
+        container.appendChild(note.children[0].cloneNode(true));
+        for (let i = 1; i < note.children.length; i++) {
+          const child = note.children[i];
+          if (child.tagName === "P" && child.innerText === "") {
+            continue;
+          } else {
+            container.appendChild(child.cloneNode(true));
+            break;
+          }
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(container);
+        }
+        return container.innerHTML
+      } else {
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        return note.innerHTML;
+      }
+    } else {
+      // Remove any anchor links if they are present
+      const anchorLink = note.querySelector('a.anchorjs-link');
+      if (anchorLink) {
+        anchorLink.remove();
+      }
+      if (window.Quarto?.typesetMath) {
+        window.Quarto.typesetMath(note);
+      }
+      if (note.classList.contains("callout")) {
+        return note.outerHTML;
+      } else {
+        return note.innerHTML;
+      }
+    }
+  }
+  for (var i=0; i<xrefs.length; i++) {
+    const xref = xrefs[i];
+    tippyHover(xref, undefined, function(instance) {
+      instance.disable();
+      let url = xref.getAttribute('href');
+      let hash = undefined; 
+      if (url.startsWith('#')) {
+        hash = url;
+      } else {
+        try { hash = new URL(url).hash; } catch {}
+      }
+      if (hash) {
+        const id = hash.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note !== null) {
+          try {
+            const html = processXRef(id, note.cloneNode(true));
+            instance.setContent(html);
+          } finally {
+            instance.enable();
+            instance.show();
+          }
+        } else {
+          // See if we can fetch this
+          fetch(url.split('#')[0])
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.getElementById(id);
+            if (note !== null) {
+              const html = processXRef(id, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      } else {
+        // See if we can fetch a full url (with no hash to target)
+        // This is a special case and we should probably do some content thinning / targeting
+        fetch(url)
+        .then(res => res.text())
+        .then(html => {
+          const parser = new DOMParser();
+          const htmlDoc = parser.parseFromString(html, "text/html");
+          const note = htmlDoc.querySelector('main.content');
+          if (note !== null) {
+            // This should only happen for chapter cross references
+            // (since there is no id in the URL)
+            // remove the first header
+            if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+              note.children[0].remove();
+            }
+            const html = processXRef(null, note);
+            instance.setContent(html);
+          } 
+        }).finally(() => {
+          instance.enable();
+          instance.show();
+        });
+      }
+    }, function(instance) {
+    });
+  }
+      let selectedAnnoteEl;
+      const selectorForAnnotation = ( cell, annotation) => {
+        let cellAttr = 'data-code-cell="' + cell + '"';
+        let lineAttr = 'data-code-annotation="' +  annotation + '"';
+        const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+        return selector;
+      }
+      const selectCodeLines = (annoteEl) => {
+        const doc = window.document;
+        const targetCell = annoteEl.getAttribute("data-target-cell");
+        const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+        const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+        const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+        const lineIds = lines.map((line) => {
+          return targetCell + "-" + line;
+        })
+        let top = null;
+        let height = null;
+        let parent = null;
+        if (lineIds.length > 0) {
+            //compute the position of the single el (top and bottom and make a div)
+            const el = window.document.getElementById(lineIds[0]);
+            top = el.offsetTop;
+            height = el.offsetHeight;
+            parent = el.parentElement.parentElement;
+          if (lineIds.length > 1) {
+            const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+            const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+            height = bottom - top;
+          }
+          if (top !== null && height !== null && parent !== null) {
+            // cook up a div (if necessary) and position it 
+            let div = window.document.getElementById("code-annotation-line-highlight");
+            if (div === null) {
+              div = window.document.createElement("div");
+              div.setAttribute("id", "code-annotation-line-highlight");
+              div.style.position = 'absolute';
+              parent.appendChild(div);
+            }
+            div.style.top = top - 2 + "px";
+            div.style.height = height + 4 + "px";
+            div.style.left = 0;
+            let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+            if (gutterDiv === null) {
+              gutterDiv = window.document.createElement("div");
+              gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+              gutterDiv.style.position = 'absolute';
+              const codeCell = window.document.getElementById(targetCell);
+              const gutter = codeCell.querySelector('.code-annotation-gutter');
+              gutter.appendChild(gutterDiv);
+            }
+            gutterDiv.style.top = top - 2 + "px";
+            gutterDiv.style.height = height + 4 + "px";
+          }
+          selectedAnnoteEl = annoteEl;
+        }
+      };
+      const unselectCodeLines = () => {
+        const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+        elementsIds.forEach((elId) => {
+          const div = window.document.getElementById(elId);
+          if (div) {
+            div.remove();
+          }
+        });
+        selectedAnnoteEl = undefined;
+      };
+        // Handle positioning of the toggle
+    window.addEventListener(
+      "resize",
+      throttle(() => {
+        elRect = undefined;
+        if (selectedAnnoteEl) {
+          selectCodeLines(selectedAnnoteEl);
+        }
+      }, 10)
+    );
+    function throttle(fn, ms) {
+    let throttle = false;
+    let timer;
+      return (...args) => {
+        if(!throttle) { // first call gets through
+            fn.apply(this, args);
+            throttle = true;
+        } else { // all the others get throttled
+            if(timer) clearTimeout(timer); // cancel #2
+            timer = setTimeout(() => {
+              fn.apply(this, args);
+              timer = throttle = false;
+            }, ms);
+        }
+      };
+    }
+      // Attach click handler to the DT
+      const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+      for (const annoteDlNode of annoteDls) {
+        annoteDlNode.addEventListener('click', (event) => {
+          const clickedEl = event.target;
+          if (clickedEl !== selectedAnnoteEl) {
+            unselectCodeLines();
+            const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+            if (activeEl) {
+              activeEl.classList.remove('code-annotation-active');
+            }
+            selectCodeLines(clickedEl);
+            clickedEl.classList.add('code-annotation-active');
+          } else {
+            // Unselect the line
+            unselectCodeLines();
+            clickedEl.classList.remove('code-annotation-active');
+          }
+        });
+      }
+  const findCites = (el) => {
+    const parentEl = el.parentElement;
+    if (parentEl) {
+      const cites = parentEl.dataset.cites;
+      if (cites) {
+        return {
+          el,
+          cites: cites.split(' ')
+        };
+      } else {
+        return findCites(el.parentElement)
+      }
+    } else {
+      return undefined;
+    }
+  };
+  var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+  for (var i=0; i<bibliorefs.length; i++) {
+    const ref = bibliorefs[i];
+    const citeInfo = findCites(ref);
+    if (citeInfo) {
+      tippyHover(citeInfo.el, function() {
+        var popup = window.document.createElement('div');
+        citeInfo.cites.forEach(function(cite) {
+          var citeDiv = window.document.createElement('div');
+          citeDiv.classList.add('hanging-indent');
+          citeDiv.classList.add('csl-entry');
+          var biblioDiv = window.document.getElementById('ref-' + cite);
+          if (biblioDiv) {
+            citeDiv.innerHTML = biblioDiv.innerHTML;
+          }
+          popup.appendChild(citeDiv);
+        });
+        return popup.innerHTML;
+      });
+    }
+  }
+});
+</script>
+</div> <!-- /content -->
+
+
+
+
+</body></html>

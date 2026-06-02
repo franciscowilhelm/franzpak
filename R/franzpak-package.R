@@ -33,7 +33,9 @@
 
 utils::globalVariables(
   c("...1", "...2", "DV", "IV", "Label", "LowerCI", "UpperCI",
-    "est", "label_replace", "pval", "se", "sig", "value")
+    "est", "label_replace", "pval", "se", "sig", "value",
+    "level", "display_level", "random_slope", "within_avg_effect", "group",
+    "rs_mean", "random_effect", "variance")
 )
 
 NULL

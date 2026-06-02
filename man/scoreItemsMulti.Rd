@@ -13,20 +13,20 @@ scoreItemsMulti(scalenames, dataframe, exclude = TRUE, manual_keys = NULL, ...)
 
 \item{exclude}{Boolean indicating whether to exclude participant responses where more than 1/3 of a scale are NA.}
 
-\item{manual_keys}{named list with manual keys, formatted like in \code{\link[psych:score.items]{psych::scoreItems()}}.}
+\item{manual_keys}{named list with manual keys, formatted like in \code{\link[psych:scoreItems]{psych::scoreItems()}}.}
 
-\item{...}{additional arguments to be passed to \code{\link[psych:score.items]{psych::scoreItems()}}.}
+\item{...}{additional arguments to be passed to \code{\link[psych:scoreItems]{psych::scoreItems()}}.}
 }
 \value{
 a list object holding scale scores and other information.
 }
 \description{
-This is a convenience wrapper for \code{\link[psych:score.items]{psych::scoreItems()}} that allows automatically
+This is a convenience wrapper for \code{\link[psych:scoreItems]{psych::scoreItems()}} that allows automatically
 scoring multiple scales at once.
 }
 \details{
 Note that, in line with the scoreItems function, scalenames is the first argument and data is the second argument.
-scoreItemsMulti always uses impute = "none" instead of the default impute="median" for \code{\link[psych:score.items]{psych::scoreItems()}}.
+scoreItemsMulti always uses impute = "none" instead of the default impute="median" for \code{\link[psych:scoreItems]{psych::scoreItems()}}.
 }
 \examples{
 scalenames <- c("firstscale", "secondscale")

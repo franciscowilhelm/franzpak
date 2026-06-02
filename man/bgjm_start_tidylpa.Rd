@@ -56,7 +56,7 @@ from \code{variances} and \code{covariances} arguments (passed via \code{...}). 
 explicitly specify \code{models} (e.g., \code{models = 1} or \code{models = c(1, 2, 3)}) via \code{...}.
 }
 \examples{
-\dontshow{if (interactive()) (if (getRversion() >= "3.4") withAutoprint else force)(\{ # examplesIf}
+\dontshow{if (interactive()) withAutoprint(\{ # examplesIf}
 \dontrun{
 # Using variances and covariances to specify model
 job_id <- bgjm_start_tidylpa(

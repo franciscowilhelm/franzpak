@@ -8,7 +8,8 @@ coef_wrapper(
   model,
   label_replace = NULL,
   params = c("regression"),
-  bayes = FALSE,
+  type = "un",
+  bayes = NULL,
   addci = FALSE
 )
 }
@@ -19,7 +20,16 @@ coef_wrapper(
 
 \item{params}{which types of parameters to extract, see MplusAutomation}
 
-\item{bayes}{Double p-value for one-tailed Bayes tests (gives rough p-estimates)}
+\item{type}{coefficient scale passed to \code{\link[stats:coef]{stats::coef()}} and \code{\link[stats:confint]{stats::confint()}}
+methods for \code{mplus.model} objects. Common values: \code{"un"} (default,
+unstandardized), \code{"stdyx"}, \code{"stdy"}, \code{"std"}.}
+
+\item{bayes}{\code{NULL} (default) to auto-detect from the model estimator; \code{TRUE}
+to signal a Bayesian model (enables CrI-based significance in
+\code{\link[=coef_table_mplus]{coef_table_mplus()}}); \code{FALSE} to force frequentist display. A warning is
+issued when the explicit value conflicts with the detected estimator. When
+a Bayesian model is detected, a message notes that Mplus p-values are
+one-tailed.}
 
 \item{addci}{Add confidence intervals to parameters}
 }
@@ -27,11 +37,46 @@ coef_wrapper(
 a dataframe with mplus model coefficients
 }
 \description{
-Format Mplus Model Coefficients
+Extracts regression (and optionally other) coefficients from an
+MplusAutomation model and splits the Mplus parameter labels into dependent
+(\code{DV}) and independent (\code{IV}) variable columns.
+}
+\details{
+For two-level models the output gains multilevel annotations (these columns
+are omitted entirely for single-level models, where they would carry no
+information):
+\itemize{
+\item \code{level} -- the Mplus section the parameter belongs to (\code{"Within"} or
+\code{"Between"}), parsed from the coefficient label prefix.
+\item \code{random_slope} -- \code{TRUE} when the parameter pertains to a random slope
+declared with \code{|} in the MODEL command (e.g. \verb{s | y ON x}): its mean,
+its cross-level predictors, or its variance.
+\item \code{within_avg_effect} -- \code{TRUE} for the intercept/mean of a random slope.
+These parameters are the between-person means of within-person effects.
+For these rows the opaque \code{DV}/\code{IV} (e.g. slope \code{S} "ON" \code{Intercepts}) is
+re-expressed as the within-person relationship the slope captures, so that
+\verb{s | y ON x} is reported with \code{DV = "Y"} and \code{IV = "X"}.
+\item \code{random_effect} -- \code{TRUE} for the other parameters of a random slope: its
+cross-level predictors (\verb{s ON w}, reported with \code{DV} set to the slope's
+outcome) and its (residual) variance (reported with \code{IV} set to
+\code{"Residual variance"}/\code{"Variance"}). When several random slopes share an
+outcome column, these \code{IV} labels are qualified with the slope they belong
+to, e.g. \code{"W (Y on X)"}, so they stay unambiguous.
+\item \code{variance} -- \code{TRUE} for (residual) variance parameters.
+\item \code{display_level} -- the section \code{\link[=coef_table_mplus]{coef_table_mplus()}} places the parameter
+in: \code{"Within"} (within-person effects, including random-slope means),
+\code{"Between"} (between-person effects), or \code{"Random effects"} (a random
+slope's cross-level predictors and variance).
+}
 }
 \examples{
 \dontrun{
-# get coefficients including confidence intervals
-coef_wrapper(mplusmodel, params = c('regression', 'new'), addci = TRUE)
+# unstandardized coefficients with CIs
+mplusmodels <- MplusAutomation::readModels("inst/extdata")
+coef_wrapper(mplusmodels$ex5.11.out, params = c('regression', 'new'), addci = TRUE)
+# fully standardized
+coef_wrapper(mplusmodels$ex5.11.out, type = "stdyx")
+# two-level model with a random slope: note the level / random_slope columns
+coef_wrapper(mplusmodels$ex9.2c.out, params = c('regression', 'expectation'))
 }
 }

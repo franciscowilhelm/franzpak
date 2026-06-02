@@ -1,6 +1,6 @@
 Package: franzpak
 Title: Miscellaneous functions for social science data analysis
-Version: 0.3.1
+Version: 0.3.2
 Authors@R: 
     person("Francisco", "Wilhelm", , "francisco.wilhelm@unibe.ch", role = c("aut", "cre"),
            comment = c(ORCID = "0000-0002-1717-7975"))
@@ -8,7 +8,6 @@ Description: What the package does (one paragraph).
 License: MIT + file LICENSE
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
-RoxygenNote: 7.3.2
 Suggests:
     MplusAutomation,
     RSA,
@@ -39,3 +38,4 @@ Imports:
 Depends: 
     R (>= 4.1.0)
 LazyData: true
+Config/roxygen2/version: 8.0.0

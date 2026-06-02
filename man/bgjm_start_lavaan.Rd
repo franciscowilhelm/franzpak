@@ -46,7 +46,7 @@ Launches a child process that runs one of \code{lavaan::sem()}, \code{lavaan::cf
 or \code{lavaan::lavaan()} with the provided syntax and data.
 }
 \examples{
-\dontshow{if (interactive()) (if (getRversion() >= "3.4") withAutoprint else force)(\{ # examplesIf}
+\dontshow{if (interactive()) withAutoprint(\{ # examplesIf}
 \dontrun{
 job_id <- bgjm_start_lavaan(
   model_syntax = "f1 =~ x1 + x2 + x3",
