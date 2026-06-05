@@ -71,10 +71,8 @@ rmarkdown::render("README.Rmd")
 
 **4. Mplus Integration** (`R/mplus_coef_tools.R`)
 - `coef_wrapper()`: Extracts and formats coefficients from MplusAutomation models
-  - Splits Mplus labels into DV/IV columns using `<-` separator
-  - Supports Bayesian models (converts one-tailed to two-tailed p-values)
-  - Optional confidence intervals via `addci = TRUE`
 - Requires MplusAutomation package
+- function functionalities are tested using Mplus example inputs and outputs, in exampleData/ or inst/extdata
 
 ### Package Dependencies
 

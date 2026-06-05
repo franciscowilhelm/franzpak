@@ -260,6 +260,53 @@ test_that("coef_table_mplus Bayes CrI values and significance stars are correct"
   expect_true(grepl("\\*", d$est_col__F3[d$IV == "F2"]))
 })
 
+# --- coef_table_mplus: one-tailed p-value message gating ---
+
+test_that("coef_table_mplus does not emit the one-tailed message in est_ci (CrI) mode", {
+  skip_if_not_installed("MplusAutomation")
+
+  # Bayesian default is est_ci: significance comes from the credibility interval,
+  # so the one-tailed p-value note would be noise and must not be emitted.
+  m <- MplusAutomation::readModels(find_extdata("ex5.11_BAYES.out"), quiet = TRUE)
+  expect_no_message(coef_table_mplus(m))
+  expect_no_message(coef_table_mplus(m, display_type = "est_ci"))
+})
+
+test_that("coef_table_mplus emits the one-tailed message in est_se mode for Bayes", {
+  skip_if_not_installed("MplusAutomation")
+
+  # est_se displays p-values, so the one-tailed caveat is relevant.
+  m <- MplusAutomation::readModels(find_extdata("ex5.11_BAYES.out"), quiet = TRUE)
+  expect_message(coef_table_mplus(m, display_type = "est_se"), regexp = "one-tailed")
+})
+
+test_that("coef_wrapper pval_note = FALSE suppresses the one-tailed message", {
+  skip_if_not_installed("MplusAutomation")
+
+  m <- MplusAutomation::readModels(find_extdata("ex5.11_BAYES.out"), quiet = TRUE)
+  expect_message(coef_wrapper(m), regexp = "one-tailed")
+  expect_no_message(coef_wrapper(m, pval_note = FALSE))
+})
+
+# --- coef_table_mplus: est_ci footnote defines LL/UL ---
+
+test_that("coef_table_mplus est_ci footnote defines LL and UL", {
+  skip_if_not_installed("MplusAutomation")
+  skip_if_not_installed("gt")
+
+  # Bayesian model -> credibility interval wording.
+  mb   <- MplusAutomation::readModels(find_extdata("ex5.11_BAYES.out"), quiet = TRUE)
+  html <- as.character(gt::as_raw_html(coef_table_mplus(mb)))
+  expect_true(grepl("LL and UL are the lower and upper limits", html))
+  expect_true(grepl("credibility interval", html))
+
+  # Frequentist model in est_ci -> confidence interval wording.
+  mf   <- MplusAutomation::readModels(find_extdata("ex5.11.out"), quiet = TRUE)
+  htmlf <- as.character(gt::as_raw_html(coef_table_mplus(mf, display_type = "est_ci")))
+  expect_true(grepl("LL and UL are the lower and upper limits", htmlf))
+  expect_true(grepl("confidence interval", htmlf))
+})
+
 # --- helpers: random-slope detection and two-level detection ---
 
 test_that("mplus_random_slopes parses the | declaration for ex9.2c", {
@@ -270,6 +317,131 @@ test_that("mplus_random_slopes parses the | declaration for ex9.2c", {
 
   expect_equal(rs$slope, "S")
   expect_equal(rs$definition, "Y ON X")
+})
+
+test_that("mplus_random_slopes excludes XWITH latent interactions", {
+  # XWITH is declared with `|` too, but the interaction term is a predictor,
+  # not a random effect, so it must not appear among the random slopes.
+  m <- list(input = list(model = c(
+    "!CENG x CSM-C (focal moderation: CSM-C moderates the CENG_T3 -> SCS_T4 path)",
+    "CE_CSMC | CENG_T3 XWITH CSMC_T1;",
+    "SCS_T4 ON CE_CSMC;"
+  )))
+
+  rs <- franzpak:::mplus_random_slopes(m)
+
+  expect_equal(nrow(rs), 0)
+  expect_false(any(grepl("XWITH", rs$slope)))
+})
+
+test_that("mplus_random_slopes excludes XWITH but keeps real slopes alongside it", {
+  m <- list(input = list(model = c(
+    "s | y ON x;",
+    "f1xf2 | f1 XWITH f2;",
+    "y ON f1xf2;"
+  )))
+
+  rs <- franzpak:::mplus_random_slopes(m)
+
+  expect_equal(rs$slope, "S")
+  expect_equal(rs$kind, "slope")
+  expect_false("F1XF2" %in% rs$slope)
+})
+
+test_that("mplus_random_slopes flags growth factors as kind = 'growth'", {
+  skip_if_not_installed("MplusAutomation")
+
+  # ex6.12 is a single-level growth model (TYPE = RANDOM, no TWOLEVEL): growth
+  # factors i/s declared with one `|` and a random slope st for a TVC.
+  m  <- MplusAutomation::readModels(find_extdata("ex6.12.out"), quiet = TRUE)
+  rs <- franzpak:::mplus_random_slopes(m)
+
+  # Both growth factors from `i s | y1-y4 AT a11-a14` are returned (multi-factor
+  # LHS), tagged growth with no outcome/predictor decomposition.
+  growth <- rs[rs$kind == "growth", ]
+  expect_setequal(growth$slope, c("I", "S"))
+  expect_true(all(is.na(growth$outcome)))
+
+  # The random slope st (ON-form) is tagged slope.
+  st <- rs[rs$slope == "ST", ]
+  expect_true(all(st$kind == "slope"))
+  expect_equal(unique(st$outcome), c("Y1", "Y2", "Y3", "Y4"))
+})
+
+# --- coef_wrapper: XWITH (latent interaction) ---
+
+test_that("coef_wrapper keeps an XWITH interaction term as an ordinary predictor", {
+  skip_if_not_installed("MplusAutomation")
+
+  # ex5.13 is a single-level SEM with a latent interaction f1xf2 | f1 XWITH f2,
+  # used as a predictor: f3 ON f1xf2.
+  m <- MplusAutomation::readModels(find_extdata("ex5.13.out"), quiet = TRUE)
+  r <- coef_wrapper(m, params = "regression")
+
+  # Single-level: no multilevel annotations, plain coefficients only.
+  expect_false(any(c("level", "random_slope", "display_level") %in% names(r)))
+
+  # The interaction appears as a predictor of F3, untouched (not re-expressed).
+  fx <- r[trimws(r$IV) == "F1XF2", ]
+  expect_equal(nrow(fx), 1)
+  expect_equal(trimws(fx$DV), "F3")
+  expect_equal(fx$est, 0.397, tolerance = 1e-3)
+
+  # F1XF2 is never treated as an outcome / random slope.
+  expect_false("F1XF2" %in% trimws(r$DV))
+})
+
+test_that("coef_wrapper can relabel an XWITH interaction term", {
+  skip_if_not_installed("MplusAutomation")
+
+  m <- MplusAutomation::readModels(find_extdata("ex5.13.out"), quiet = TRUE)
+  r <- coef_wrapper(m, params = "regression",
+                    label_replace = c("F1XF2" = "F1 x F2"))
+
+  expect_true("F1 x F2" %in% trimws(r$IV))
+  expect_false("F1XF2" %in% trimws(r$IV))
+})
+
+# --- coef_wrapper: single-level growth model (random effects) ---
+
+test_that("coef_wrapper returns plain coefficients for a single-level growth model", {
+  skip_if_not_installed("MplusAutomation")
+
+  # Growth factors / random slopes keep their own names; the regression DVs are
+  # not corrupted by the two-level random-slope re-expression.
+  m <- MplusAutomation::readModels(find_extdata("ex6.12.out"), quiet = TRUE)
+  r <- coef_wrapper(m, params = "regression")
+
+  expect_false(any(c("level", "random_slope", "display_level") %in% names(r)))
+  expect_setequal(trimws(r$DV), c("I", "S", "ST"))
+  expect_equal(trimws(r$IV), c("X", "X", "X"))
+  expect_equal(r$est[trimws(r$DV) == "S"], 0.333, tolerance = 1e-3)
+})
+
+test_that("coef_table_mplus auto-detects growth models and shows factor sections", {
+  skip_if_not_installed("MplusAutomation")
+
+  m <- MplusAutomation::readModels(find_extdata("ex6.12.out"), quiet = TRUE)
+  d <- coef_table_mplus(m, return_data = TRUE)
+
+  expect_equal(d$group, c("Predictors", "Means", "Variances"))
+  expect_equal(d$IV, c("X", "Mean", "Residual variance"))
+  expect_true(all(c("est_col__I", "est_col__S", "est_col__ST") %in% names(d)))
+  expect_false(any(grepl("__Y[1-4]$", names(d))))
+  expect_true(grepl("0\\.333\\*", d$est_col__S[d$IV == "X"]))
+  expect_true(grepl("1\\.007\\*", d$est_col__S[d$IV == "Mean"]))
+  expect_true(grepl("0\\.175\\*", d$est_col__S[d$IV == "Residual variance"]))
+})
+
+test_that("model_type can force the default layout for growth-like models", {
+  skip_if_not_installed("MplusAutomation")
+
+  m <- MplusAutomation::readModels(find_extdata("ex6.12.out"), quiet = TRUE)
+  d <- coef_table_mplus(m, model_type = "default", return_data = TRUE)
+
+  expect_false("group" %in% names(d))
+  expect_equal(d$IV, "X")
+  expect_true(all(c("est_col__I", "est_col__S", "est_col__ST") %in% names(d)))
 })
 
 test_that("mplus_random_slopes returns an empty tibble for single-level models", {
@@ -384,31 +556,34 @@ test_that("mplus_confint_safe falls back to inline intervals when no CINTERVAL t
 
 # --- coef_table_mplus: two-level Within/Between sections ---
 
-test_that("coef_table_mplus splits two-level model into Within/Between sections", {
+test_that("coef_table_mplus returns list(fixed, random) for a random-slope model", {
   skip_if_not_installed("MplusAutomation")
 
-  m <- MplusAutomation::readModels(find_extdata("ex9.2c.out"), quiet = TRUE)
+  m   <- MplusAutomation::readModels(find_extdata("ex9.2c.out"), quiet = TRUE)
   tbl <- coef_table_mplus(m)
-  d   <- table_data(tbl)
 
-  # Plain tibble carries a leading `level` column distinguishing the sections.
+  expect_type(tbl, "list")
+  expect_setequal(names(tbl), c("fixed", "random"))
+
+  d <- table_data(tbl$fixed)
+
+  # The main table is split into Within and Between only -- no "Random effects"
+  # section, and no separate column for the latent slope S.
   expect_true("level" %in% names(d))
-  expect_setequal(unique(d$level), c("Within", "Between", "Random effects"))
-
-  # There is no separate column for the random slope S; everything is under Y.
+  expect_setequal(unique(d$level), c("Within", "Between"))
   expect_false(any(grepl("__S$", names(d))))
 
   # The avg. within effect of X on Y appears as predictor X (not "Intercepts")
-  # under outcome Y, in the Within section, marked with the random-slope letter.
+  # under outcome Y, in the Within section. Formatted gt output footnotes this
+  # cell; the raw data stays clean for manipulation.
   within_x <- d[d$level == "Within" & d$IV == "X", ]
   expect_equal(nrow(within_x), 1)
   expect_true(grepl("1\\.017\\*", within_x$est_col__Y))
-  expect_true(grepl("\u1d43", within_x$est_col__Y, fixed = TRUE))
+  expect_false(grepl("\u1d43", within_x$est_col__Y, fixed = TRUE))
   expect_false("Intercepts" %in% d$IV[d$level == "Within"])
 
-  # Within rows come first; Random effects last.
+  # Within rows come first.
   expect_equal(d$level[1], "Within")
-  expect_equal(d$level[nrow(d)], "Random effects")
 
   # The between-person effect of X on Y is a distinct (fixed) coefficient in the
   # Between section, with no random-slope marker.
@@ -416,45 +591,53 @@ test_that("coef_table_mplus splits two-level model into Within/Between sections"
   expect_true(grepl("1\\.024\\*", between_x$est_col__Y))
   expect_false(grepl("\u1d43", between_x$est_col__Y, fixed = TRUE))
 
-  # Between-person effects on Y are in the Between section.
-  between_w <- d[d$level == "Between" & d$IV == "W", ]
-  expect_true(grepl("1\\.186\\*", between_w$est_col__Y))
+  # The cross-level interaction (slope S on between-predictor W) stays in the
+  # main table, with level suffixes on both components.
+  cli <- d[d$level == "Between" & d$IV == "W (between) x X (within)", ]
+  expect_equal(nrow(cli), 1)
+  expect_true(grepl("0\\.569\\*", cli$est_col__Y))
 
-  # Random effects section: cross-level predictor W of the slope, and the
-  # slope's (residual) variance.
-  re_w <- d[d$level == "Random effects" & d$IV == "W", ]
-  expect_true(grepl("0\\.569\\*", re_w$est_col__Y))
-  re_var <- d[d$level == "Random effects" & d$IV == "Residual variance", ]
-  expect_equal(nrow(re_var), 1)
-  expect_true(grepl("0\\.368\\*", re_var$est_col__Y))
+  # The slope's residual variance is NOT in the main table.
+  expect_false("Residual variance" %in% d$IV)
 })
 
-test_that("coef_table_mplus footnote distinguishes random-slope means from fixed effects", {
+test_that("coef_table_mplus random table lists each slope's predictors, mean, variance", {
+  skip_if_not_installed("MplusAutomation")
+
+  m   <- MplusAutomation::readModels(find_extdata("ex9.2c.out"), quiet = TRUE)
+  re  <- table_data(coef_table_mplus(m)$random)
+
+  # Rows ordered predictors -> mean/intercept -> variance, with cross-level
+  # predictors keeping their raw label and mean/variance relabelled by slope.
+  expect_true("Parameter" %in% names(re))
+  expect_equal(re$Parameter,
+               c("S<-W", "S<-X", "S Intercept", "S Residual Variance"))
+
+  # Values come through (cross-level W, mean, residual variance).
+  expect_true(grepl("0\\.569\\*", re$est_col[re$Parameter == "S<-W"]))
+  expect_true(grepl("1\\.017\\*", re$est_col[re$Parameter == "S Intercept"]))
+  expect_true(grepl("0\\.368\\*", re$est_col[re$Parameter == "S Residual Variance"]))
+})
+
+test_that("coef_table_mplus two-level gt output has only Within/Between row groups", {
   skip_if_not_installed("MplusAutomation")
   skip_if_not_installed("gt")
 
   m   <- MplusAutomation::readModels(find_extdata("ex9.2c.out"), quiet = TRUE)
   tbl <- coef_table_mplus(m)
-  html <- as.character(gt::as_raw_html(tbl))
 
-  expect_true(grepl("Random-slope mean/intercept", html))
+  expect_s3_class(tbl$fixed, "gt_tbl")
+  expect_s3_class(tbl$random, "gt_tbl")
+  expect_setequal(unique(tbl$fixed[["_row_groups"]]), c("Within", "Between"))
+
+  # The fixed table footnote distinguishes random-slope means and points at the
+  # companion Random effects table.
+  html <- as.character(gt::as_raw_html(tbl$fixed))
+  expect_true(grepl("Random slope intercept", html))
   expect_true(grepl("fixed effects", html))
-})
-
-test_that("coef_table_mplus two-level gt output has Within/Between/Random effects row groups", {
-  skip_if_not_installed("MplusAutomation")
-  skip_if_not_installed("gt")
-
-  m   <- MplusAutomation::readModels(find_extdata("ex9.2c.out"), quiet = TRUE)
-  tbl <- coef_table_mplus(m)
-
-  expect_s3_class(tbl, "gt_tbl")
-  expect_setequal(unique(tbl[["_row_groups"]]), c("Within", "Between", "Random effects"))
-
-  # The Random effects note is present.
-  html <- as.character(gt::as_raw_html(tbl))
-  expect_true(grepl("Random effects:", html))
-  expect_true(grepl("cross-level", html))
+  expect_true(grepl("Cross-level interactions are shown", html))
+  expect_true(grepl("&lt;between predictor&gt; \\(between\\) x", html))
+  expect_true(grepl("Random effects table", html))
 })
 
 test_that("coef_table_mplus single-level output has no level column", {
@@ -464,4 +647,158 @@ test_that("coef_table_mplus single-level output has no level column", {
   d <- table_data(coef_table_mplus(m))
 
   expect_false("level" %in% names(d))
+})
+
+test_that("coef_table_mplus defaults to display dashes and can return raw NAs", {
+  skip_if_not_installed("MplusAutomation")
+
+  m <- MplusAutomation::readModels(find_extdata("ex5.11.out"), quiet = TRUE)
+
+  d_default <- coef_table_mplus(m, return_data = TRUE)
+  value_cols <- setdiff(names(d_default), "IV")
+  expect_true(any(unlist(d_default[value_cols]) == "-", na.rm = TRUE))
+
+  d_raw <- coef_table_mplus(m, return_data = TRUE, na_replace = NULL)
+  expect_true(any(is.na(unlist(d_raw[value_cols]))))
+})
+
+test_that("return_data returns tibbles instead of gt tables", {
+  skip_if_not_installed("MplusAutomation")
+  skip_if_not_installed("gt")
+
+  m <- MplusAutomation::readModels(find_extdata("ex5.11.out"), quiet = TRUE)
+
+  expect_s3_class(coef_table_mplus(m), "gt_tbl")
+  expect_s3_class(coef_table_mplus(m, return_data = TRUE), "tbl_df")
+})
+
+# --- interval extraction (long names / CINTERVAL truncation) ---
+
+test_that("mplus_confint_safe reads intervals from the untruncated estimate table", {
+  # Mplus truncates variable names to 8 characters in the CINTERVAL section, so
+  # the dedicated ci.* table can carry a truncated header (M_APREG_) while the
+  # main estimate table keeps the full name (M_APREG_S). Reading intervals from
+  # the estimate table keeps the labels consistent with coef().
+  fake <- list(parameters = list(
+    unstandardized = data.frame(
+      paramHeader   = "M_APREG_S.ON",
+      param         = "M_EST_A",
+      est           = 0.20,
+      posterior_sd  = 0.10,
+      pval          = 0.01,
+      lower_2.5ci   = 0.031,
+      upper_2.5ci   = 0.423,
+      BetweenWithin = "Within",
+      stringsAsFactors = FALSE
+    ),
+    ci.unstandardized = data.frame(   # truncated header -- must not be used
+      paramHeader   = "M_APREG_.ON",
+      param         = "M_EST_A",
+      low2.5        = 0.031,
+      up2.5         = 0.423,
+      BetweenWithin = "Within",
+      stringsAsFactors = FALSE
+    )
+  ))
+
+  ci <- franzpak:::mplus_confint_safe(fake, params = "regression", type = "un")
+
+  expect_equal(ci$Label, "W M_APREG_S<-M_EST_A")
+  expect_equal(ci$LowerCI, 0.031, tolerance = 1e-12)
+  expect_equal(ci$UpperCI, 0.423, tolerance = 1e-12)
+})
+
+# --- predictor_order ---
+
+test_that("predictor_order reorders predictor rows; unlisted ones follow", {
+  skip_if_not_installed("MplusAutomation")
+  skip_if_not_installed("gt")
+
+  m <- MplusAutomation::readModels(find_extdata("ex5.11.out"), quiet = TRUE)
+
+  # Default appearance order.
+  expect_equal(table_data(coef_table_mplus(m))$IV, c("F3", "F1", "F2"))
+
+  # Listed predictors come first in the given order; F3 (unlisted) trails.
+  d <- table_data(coef_table_mplus(m, predictor_order = c("F2", "F1")))
+  expect_equal(d$IV, c("F2", "F1", "F3"))
+})
+
+test_that("predictor_order matches displayed labels (after label_replace)", {
+  skip_if_not_installed("MplusAutomation")
+  skip_if_not_installed("gt")
+
+  m <- MplusAutomation::readModels(find_extdata("ex5.11.out"), quiet = TRUE)
+  d <- table_data(coef_table_mplus(
+    m,
+    label_replace   = c("F1" = "Alpha", "F2" = "Beta"),
+    predictor_order = c("Beta", "Alpha")
+  ))
+  expect_equal(d$IV, c("Beta", "Alpha", "F3"))
+})
+
+test_that("predictor_order applies within each section of the two-level fixed table", {
+  skip_if_not_installed("MplusAutomation")
+  skip_if_not_installed("gt")
+
+  m <- MplusAutomation::readModels(find_extdata("ex9.5_BAYES.out"), quiet = TRUE)
+  d <- suppressMessages(table_data(coef_table_mplus(
+    m,
+    predictor_order = c("X1", "X2")
+  )$fixed))
+
+  # Only Within / Between sections now; ordering happens within sections.
+  expect_equal(unique(d$level), c("Within", "Between"))
+  # Default Within order is X2, X1, Y1; the explicit order puts X1 first.
+  expect_equal(d$IV[d$level == "Within"], c("X1", "X2", "Y1"))
+})
+
+test_that("predictor_order warns on names absent from the table and validates type", {
+  skip_if_not_installed("MplusAutomation")
+
+  m <- MplusAutomation::readModels(find_extdata("ex5.11.out"), quiet = TRUE)
+  expect_warning(coef_table_mplus(m, predictor_order = c("F2", "NOPE")),
+                 "not in the table")
+  expect_error(coef_table_mplus(m, predictor_order = 1:3),
+               "must be a character vector")
+})
+
+test_that("coef_table_mplus gives no outcome column to predictor-only variables", {
+  skip_if_not_installed("MplusAutomation")
+  skip_if_not_installed("gt")
+
+  # X1 is a within-only predictor (only ever an IV). Inject a between-level mean
+  # for it, mimicking the latent between component Mplus estimates for random
+  # effects: it must not earn an outcome column off its mean alone.
+  m <- MplusAutomation::readModels(find_extdata("ex9.5_BAYES.out"), quiet = TRUE)
+  u <- m$parameters$unstandardized
+  newrow <- u[1, ]
+  newrow$paramHeader <- "Means"
+  newrow$param       <- "X1"
+  newrow$est         <- 0.5
+  newrow$posterior_sd <- 0.1
+  newrow$pval        <- 0.01
+  newrow$lower_2.5ci <- 0.3
+  newrow$upper_2.5ci <- 0.7
+  newrow$BetweenWithin <- "Between"
+  m$parameters$unstandardized <- rbind(u, newrow)
+
+  d <- suppressMessages(coef_table_mplus(m)$fixed)[["_data"]]
+
+  # The real outcomes keep their columns; the predictor-only X1 does not.
+  expect_true(any(grepl("__Y1$", names(d))))
+  expect_true(any(grepl("__Y2$", names(d))))
+  expect_false(any(grepl("__X1$", names(d))))
+})
+
+test_that("coef_wrapper(addci=TRUE) leaves no NA intervals for Bayesian models", {
+  skip_if_not_installed("MplusAutomation")
+
+  params <- c("regression", "expectation", "variability")
+  for (f in c("ex5.11_BAYES.out", "ex9.2c_BAYES.out", "ex9.5_BAYES.out")) {
+    m  <- MplusAutomation::readModels(find_extdata(f), quiet = TRUE)
+    cw <- suppressMessages(coef_wrapper(m, params = params, addci = TRUE))
+    expect_false(any(is.na(cw$LowerCI)), info = f)
+    expect_false(any(is.na(cw$UpperCI)), info = f)
+  }
 })

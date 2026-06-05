@@ -13,7 +13,10 @@ coef_table_mplus(
   type = "un",
   sig_threshold = 0.05,
   digits = 3,
-  na_replace = NULL
+  na_replace = "-",
+  predictor_order = NULL,
+  model_type = c("auto", "growth", "default"),
+  return_data = FALSE
 )
 }
 \arguments{
@@ -23,7 +26,7 @@ coef_table_mplus(
 
 \item{params}{Which parameter types to extract (passed to MplusAutomation).
 \code{NULL} (default) resolves to \code{c("regression", "expectation", "variability")}
-for two-level models and \code{"regression"} otherwise.}
+for two-level and growth tables, and \code{"regression"} otherwise.}
 
 \item{bayes}{\code{NULL} (default) to auto-detect; \code{TRUE}/\code{FALSE} to override.
 Warnings from conflicting explicit values are issued by \code{\link[=coef_wrapper]{coef_wrapper()}}.}
@@ -38,19 +41,44 @@ p-value stars), or \code{"est_ci"} (estimate + CI LL/UL, interval-exclusion star
 \item{digits}{Number of decimal places (default 3).}
 
 \item{na_replace}{Character string to substitute for empty cells (predictors that
-do not enter a given outcome). Common choices: \code{"-"} or \code{""}. \code{NULL} (default)
-leaves NAs as-is.}
+do not enter a given outcome). Default \code{"-"}; set \code{NULL} to keep true \code{NA}
+values, which is usually preferable with \code{return_data = TRUE}.}
+
+\item{predictor_order}{Character vector giving the order of the predictor
+(row) labels. Entries must match the \emph{displayed} predictor labels, i.e.
+after any \code{label_replace} and random-slope remapping. Listed predictors come
+first, in the given order; any predictors not listed keep their original
+order after them. In two-level tables the order is applied within each
+section (Within / Between) of the main table. \code{NULL} (default) keeps the
+order in which predictors appear in the Mplus output. A warning is issued
+for listed names that are not present in the table.}
+
+\item{model_type}{\code{"auto"} (default), \code{"growth"}, or \code{"default"}. \code{"auto"}
+uses parsed \code{|} syntax to detect growth-factor models; \code{"growth"} forces
+the growth-specific table layout.}
+
+\item{return_data}{\code{FALSE} (default) returns formatted \code{gt} tables when
+\strong{gt} is installed. \code{TRUE} returns the underlying wide tibble(s), useful
+for data manipulation. Use \code{na_replace = NULL} with \code{return_data = TRUE} to
+keep missing cells as real \code{NA} values.}
 }
 \value{
-A \code{gt} table, or a plain tibble when \strong{gt} is not installed.
+A \code{gt} table (or a plain tibble when \strong{gt} is not installed). For
+two-level models with random slopes, a named list with elements \code{fixed}
+(the main predictor x outcome table) and \code{random} (the Random effects
+table), each a \code{gt} table or tibble.
 }
 \description{
 Produces a predictor x outcome table with nested sub-columns for each outcome.
 Display is controlled by \code{display_type}:
 \itemize{
 \item \code{"est_se"}: estimate (starred when p < \code{sig_threshold}) and SE. When the
-model is Bayesian the footnote notes that p-values are one-tailed.
-\item \code{"est_ci"}: estimate (starred when 95\% CI/CrI excludes zero), LL, UL.
+model is Bayesian the footnote notes that p-values are one-tailed, and a
+message to the same effect is emitted (since p-values are in play here).
+\item \code{"est_ci"}: estimate (starred when the 95\% CI/CrI excludes zero), and LL/UL,
+the lower and upper limits of that interval (defined in the footnote).
+Significance comes from the interval, not p-values, so the one-tailed
+p-value message is not emitted for Bayesian models in this mode.
 }
 }
 \details{
@@ -60,24 +88,57 @@ The estimator is auto-detected from the model when \code{bayes = NULL} (default)
 Returns a \code{gt} table when the \strong{gt} package is available, otherwise a plain tibble.
 \subsection{Two-level models}{
 
-For two-level models the table is split into up to three sections (row groups
-in \code{gt}, a leading \code{level} column in the plain tibble):
+The main (fixed-effects) table is split into two sections (row groups in \code{gt},
+a leading \code{level} column in the plain tibble):
 \itemize{
 \item \strong{Within} -- within-person effects, including the means/intercepts of
 random slopes (latent slopes declared with \code{|}, e.g. \verb{s | y ON x}). A slope
 mean is the between-person mean of a within-person effect and is shown under
 the predictor it represents (\code{x}), marked with a superscript letter.
-\item \strong{Between} -- between-person effects on the real outcomes.
-\item \strong{Random effects} -- the remaining parameters of each random slope: its
-between-level predictors (cross-level interactions, \verb{s ON w}) and its
-(residual) variance. These are shown under the slope's outcome column rather
-than giving the latent slope its own outcome column.
+\item \strong{Between} -- between-person effects on the real outcomes, including
+cross-level interactions (a slope regressed on a between predictor, \verb{s ON w}). These are relabelled to name the interaction explicitly, e.g. the \code{w}
+predictor of \verb{s2 | y2 ON y1} is shown as
+\code{"W (between) x Y1 (within)"} under outcome \code{Y2}.
 }
+}
+
+\subsection{The Random effects table}{
+
+A random slope is associated with a specific within-person fixed effect and
+only secondarily with an outcome, so its parameters do not fit cleanly into
+the predictor x outcome layout. When the model has random slopes,
+\code{coef_table_mplus()} therefore returns a \strong{named list}
+\verb{list(fixed = <main table>, random = <Random effects table>)}. Models without
+random slopes (single-level models, growth models, two-level models with no
+\code{|} slope) return a single table as before.
+
+The Random effects table lists, for each random slope (grouped by the latent
+slope, in the order its between-level predictors, then its mean/intercept,
+then its (residual) variance), the estimate and either LL/UL or SE. It keeps
+the Mplus parameter \code{Label} (slope name on the left of the operator) as the
+row identifier. The slope mean and any cross-level predictors thus appear in
+\emph{both} tables: re-expressed as fixed effects in the main table, and
+slope-by-slope here.
 
 For two-level models \code{params} defaults to
 \code{c("regression", "expectation", "variability")} so means/intercepts and the
 random-slope variance are included; variances that do not belong to a random
-slope are omitted from the table.
+slope are omitted from both tables.
+}
+
+\subsection{Growth models}{
+
+When \code{model_type = "auto"} (default), models with a growth-factor \code{|}
+declaration such as \verb{i s | y1-y4 AT ...} are detected as growth models. Set
+\code{model_type = "growth"} to force the growth layout, or \code{"default"} to use the
+ordinary predictor x outcome layout. Growth tables show factor predictors,
+means, and variances in separate row sections.
+
+Only genuine outcomes (the dependent variable of a regression, random-slope
+mean, cross-level effect or variance) are given an outcome column. A variable
+that appears only as a predictor gets no column, even though Mplus estimates a
+between-level mean for every latent component; its mean/intercept row is
+dropped so it cannot create a spurious column.
 }
 }
 \examples{
@@ -85,10 +146,14 @@ slope are omitted from the table.
 m <- MplusAutomation::readModels("inst/extdata/ex5.11.out")
 coef_table_mplus(m)
 coef_table_mplus(m, display_type = "est_ci")
-coef_table_mplus(m, na_replace = "-")
+coef_table_mplus(m, na_replace = NULL, return_data = TRUE)
 coef_table_mplus(m, label_replace = c("F3" = "Mediator", "F4" = "Outcome"))
-# two-level model: Within/Between sections, random-slope mean in Within
+# put F2 above F1 in the predictor column
+coef_table_mplus(m, predictor_order = c("F2", "F1"))
+# two-level model with a random slope: returns list(fixed = , random = )
 m2 <- MplusAutomation::readModels("inst/extdata/ex9.2c.out")
-coef_table_mplus(m2)
+tbls <- coef_table_mplus(m2)
+tbls$fixed   # within/between fixed effects (cross-level interactions relabelled)
+tbls$random  # the Random effects table
 }
 }

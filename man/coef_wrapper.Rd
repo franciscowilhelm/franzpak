@@ -10,7 +10,8 @@ coef_wrapper(
   params = c("regression"),
   type = "un",
   bayes = NULL,
-  addci = FALSE
+  addci = FALSE,
+  pval_note = TRUE
 )
 }
 \arguments{
@@ -27,11 +28,15 @@ unstandardized), \code{"stdyx"}, \code{"stdy"}, \code{"std"}.}
 \item{bayes}{\code{NULL} (default) to auto-detect from the model estimator; \code{TRUE}
 to signal a Bayesian model (enables CrI-based significance in
 \code{\link[=coef_table_mplus]{coef_table_mplus()}}); \code{FALSE} to force frequentist display. A warning is
-issued when the explicit value conflicts with the detected estimator. When
-a Bayesian model is detected, a message notes that Mplus p-values are
-one-tailed.}
+issued when the explicit value conflicts with the detected estimator.}
 
 \item{addci}{Add confidence intervals to parameters}
+
+\item{pval_note}{When \code{TRUE} (default) and the model is Bayesian, a message
+notes that the Mplus p-values are one-tailed. Set \code{FALSE} to suppress it
+(e.g. when significance is judged from credibility intervals rather than
+p-values, so the note is just noise). \code{\link[=coef_table_mplus]{coef_table_mplus()}} sets this
+automatically based on whether it displays p-values.}
 }
 \value{
 a dataframe with mplus model coefficients
@@ -42,6 +47,19 @@ MplusAutomation model and splits the Mplus parameter labels into dependent
 (\code{DV}) and independent (\code{IV}) variable columns.
 }
 \details{
+The \code{|} operator in Mplus is overloaded: it declares random effects (random
+intercepts/slopes in multilevel models), growth factors, and latent variable
+interactions (\code{XWITH}). Random effects and growth factors are treated alike
+(there is no reliable way to tell them apart). Latent interactions are \emph{not}
+random effects: the interaction term (e.g. \code{f1xf2} in \verb{f1xf2 | f1 XWITH f2})
+is left in the output as an ordinary predictor.
+
+The multilevel annotations and random-slope re-expression below apply only to
+two-level models. Single-level models -- including single-level growth models
+and models with \code{XWITH} interactions -- are returned as plain coefficients,
+with each random effect appearing under its own name as an ordinary
+outcome/predictor.
+
 For two-level models the output gains multilevel annotations (these columns
 are omitted entirely for single-level models, where they would carry no
 information):
@@ -63,10 +81,13 @@ outcome) and its (residual) variance (reported with \code{IV} set to
 outcome column, these \code{IV} labels are qualified with the slope they belong
 to, e.g. \code{"W (Y on X)"}, so they stay unambiguous.
 \item \code{variance} -- \code{TRUE} for (residual) variance parameters.
-\item \code{display_level} -- the section \code{\link[=coef_table_mplus]{coef_table_mplus()}} places the parameter
-in: \code{"Within"} (within-person effects, including random-slope means),
-\code{"Between"} (between-person effects), or \code{"Random effects"} (a random
-slope's cross-level predictors and variance).
+\item \code{display_level} -- a coarse classification of the parameter: \code{"Within"}
+(within-person effects, including random-slope means), \code{"Between"}
+(between-person effects), or \code{"Random effects"} (a random slope's
+cross-level predictors and variance). \code{\link[=coef_table_mplus]{coef_table_mplus()}} uses this to
+route parameters: random-effect rows go to the separate Random effects
+table (with cross-level interactions also kept, relabelled, in the Between
+section of the main table).
 }
 }
 \examples{

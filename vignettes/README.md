@@ -29,6 +29,7 @@ Guide to formatting Mplus coefficients with `coef_wrapper()` and
 - Automatic Bayesian vs. frequentist detection and display
 - Two-level models: Within/Between sections, with random-slope means/intercepts
   reported as between-person means of within-person effects
+- Path models with several random slopes (each remapped to its own outcome)
 
 **To build the vignettes:**
 

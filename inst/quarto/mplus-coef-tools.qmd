@@ -28,7 +28,9 @@ Both functions:
   interval-exclusion stars);
 - understand **two-level (multilevel) models**, splitting effects into
   **Within** and **Between** sections and reporting the means/intercepts of
-  random slopes as the *between-person means of within-person effects*.
+  random slopes as the *between-person means of within-person effects*. When a
+  model has random slopes, `coef_table_mplus()` returns a *pair* of tables --
+  the fixed-effects table plus a dedicated **Random effects** table.
 
 The examples use the classic Mplus User's Guide data files that ship with
 `franzpak` in `inst/extdata/`.
@@ -101,17 +103,39 @@ Switch to an estimate + confidence-interval display with
 coef_table_mplus(m_sem, display_type = "est_ci")
 ```
 
-Rename the cryptic Mplus factor labels with `label_replace`, and fill empty
-cells with `na_replace`:
+Rename the cryptic Mplus factor labels with `label_replace`. Empty cells are
+shown as dashes by default; set `na_replace = NULL` when you want true `NA`
+values in the underlying data:
 
 ```{r ct-labels}
 coef_table_mplus(
   m_sem,
   label_replace = c("F1" = "Predictor 1", "F2" = "Predictor 2",
-                    "F3" = "Mediator",    "F4" = "Outcome"),
-  na_replace    = "-"
+                    "F3" = "Mediator",    "F4" = "Outcome")
 )
 ```
+
+For data manipulation instead of display, use `return_data = TRUE`:
+
+```{r ct-raw}
+coef_table_mplus(m_sem, return_data = TRUE, na_replace = NULL)
+```
+
+Control the order of the predictor rows with `predictor_order`. Listed
+predictors come first, in the order given; any not listed keep their original
+position after them. The names must match the *displayed* labels, so they apply
+after `label_replace`:
+
+```{r ct-order}
+coef_table_mplus(
+  m_sem,
+  label_replace   = c("F1" = "Predictor 1", "F2" = "Predictor 2"),
+  predictor_order = c("Predictor 2", "Predictor 1")
+)
+```
+
+In two-level tables the order is applied within each section (Within / Between /
+Random effects).
 
 ## Bayesian estimation is detected automatically
 
@@ -186,77 +210,265 @@ relationship the slope captures (`s | y ON x`):
 Variances that do not belong to a random slope (here the residual variances of
 `Y`) are kept by `coef_wrapper()` but omitted from the table below.
 
-## `coef_table_mplus()` builds a three-section table
+## `coef_table_mplus()` returns a fixed-effects table and a Random effects table
 
-The table now has up to three sections:
+A random slope is associated with a *specific within-person fixed effect* and
+only secondarily with an outcome variable, so cramming all of its parameters
+into the predictor x outcome grid (under the `Y` column) made the table hard to
+read. Instead, when a model has random slopes `coef_table_mplus()` returns a
+**named list** with two elements:
+
+- `$fixed` -- the main predictor x outcome table, with **Within** and
+  **Between** sections only;
+- `$random` -- a **Random effects** table listing every random-slope parameter.
+
+```{r ct-ml}
+tbls <- coef_table_mplus(m_ml)
+tbls$fixed
+```
+
+The fixed-effects table keeps two sections:
 
 - **Within** -- within-person effects. The within-person effect of `X` on `Y`
   (the random-slope mean) appears as predictor `X` under outcome `Y`, marked with
   a superscript letter (the APA convention for a *specific note*; the dagger is
   avoided because APA reserves it for marginal significance).
-- **Between** -- between-person effects on the real outcome `Y`. Note that the
+- **Between** -- between-person effects on the real outcome `Y`. The
   *between-person* effect of `X` on `Y` (1.024) is a separate, fixed coefficient,
-  kept clearly apart from its *within-person* counterpart (1.017) -- the classic
-  within/between decomposition.
-- **Random effects** -- the remaining parameters of the random slope `S`: its
-  between-level predictors `W` and `X` (cross-level interactions) and its
-  residual variance. These appear under the `Y` column instead of giving the
-  latent slope `S` its own outcome column.
+  kept clearly apart from its *within-person* counterpart (1.017). Cross-level
+  interactions (the slope `S` regressed on a between predictor) stay here too,
+  **relabelled to name the interaction**: `S ON W` becomes
+  `W (between) x X (within)` (the between variable `W` moderating the within
+  `X -> Y` slope).
 
-```{r ct-ml}
-coef_table_mplus(m_ml)
+The Random effects table collects the slope's parameters, grouped by slope and
+ordered predictors -> mean/intercept -> variance. A slope's mean/intercept and
+variance are relabelled by slope (`S Intercept`, `S Residual Variance`), while
+its cross-level predictors keep their raw Mplus label (e.g. `S<-W`) so their
+source stays unambiguous:
+
+```{r re-ml}
+tbls$random
 ```
 
 Use `label_replace` to give the outcomes and predictors more descriptive names
-(slope parameters follow their remapped predictor/outcome, so renaming `X` and
-`Y` is enough):
+in the fixed table (slope parameters follow their remapped predictor/outcome, so
+renaming `X` and `Y` is enough; the relabelled cross-level interaction picks up
+the new names too):
 
 ```{r ct-ml-labels}
 coef_table_mplus(
   m_ml,
   label_replace = c("Y" = "Outcome Y", "X" = "Predictor X", "W" = "Cluster W")
-)
+)$fixed
 ```
 
-When the package is rendering to a plain tibble (no `gt` installed), the
-section is carried in a leading `level` column instead of a row group, so the
-section structure is never lost.
+When the package is rendering to plain tibbles (no `gt` installed), each table is
+a tibble; the fixed table carries its section in a leading `level` column instead
+of a row group, so the structure is never lost.
 
 ## Two-level Bayesian model
 
 The Bayesian variant `ex9.2c_BAYES` defaults to a credibility-interval display.
-The random-slope mean is again remapped to its within predictor and placed in
-the Within section.
+The random-slope mean is again placed in the Within section, and the Random
+effects table reports CrI limits.
 
 ```{r ct-ml-bayes, message=TRUE}
 m_ml_bayes <- readModels(mplus_file("ex9.2c_BAYES.out"), quiet = TRUE)
-coef_table_mplus(m_ml_bayes)
+ml_bayes <- coef_table_mplus(m_ml_bayes)
+ml_bayes$fixed
+ml_bayes$random
 ```
 
 ::: {.callout-note}
-## Intervals without a CINTERVAL table
+## Where the intervals come from
 
-`coef_table_mplus()` (via an internal helper) first asks
-`MplusAutomation`'s `confint()` for intervals, which requires the Mplus
-`CINTERVAL` output. If that table is unavailable -- common for Bayesian runs
-where the credibility limits are printed inline in `MODEL RESULTS` -- the tools
-fall back to reconstructing the 95% interval from those inline columns, so
-`display_type = "est_ci"` keeps working. If no intervals can be found at all
-(e.g. a frequentist run without `CINTERVAL`), the table gracefully falls back to
-the estimate + SE display.
+`coef_table_mplus()` (via an internal helper) first looks for interval columns
+*in the main estimate table* -- the credibility limits Bayesian runs print
+inline in `MODEL RESULTS`. These are reconstructed from the same parameter
+columns that supply the estimates, so the labels always line up and the values
+join cleanly even when variable names are long. Only if the estimate table
+carries no intervals (typical of frequentist runs) does it fall back to
+`MplusAutomation`'s `confint()`, which reads the dedicated `CINTERVAL` table. If
+no intervals can be found at all (a frequentist run without `CINTERVAL`), the
+table gracefully falls back to the estimate + SE display.
+
+Preferring the estimate table also sidesteps an Mplus quirk: variable names are
+truncated to 8 characters in the `CINTERVAL` section, so a long name like
+`M_APREG_S` is printed there as `M_APREG_`. Joining intervals from that section
+by label would silently drop the affected rows; reading from the (untruncated)
+estimate table avoids the problem.
 :::
+
+# Part 3: A two-level model with *several* random slopes
+
+`ex9.5` (Mplus User's Guide example 9.5, Bayesian variant) is a two-level
+**path analysis** with two random slopes, so it exercises the same machinery as
+Part 2 but with more than one slope in play:
+
+```default
+%WITHIN%
+  s2 | y2 ON y1;     ! random slope of y2 on y1
+  y2 ON x2;          ! fixed within-person effect
+  s1 | y1 ON x2;     ! random slope of y1 on x2
+  y1 ON x1;          ! fixed within-person effect
+%BETWEEN%
+  y1 y2 s1 s2 ON w;  ! between-level regressions of the outcomes and both slopes
+```
+
+The two slopes capture different within-person relationships -- `s2` is the
+effect of `y1` on `y2`, and `s1` is the effect of `x2` on `y1` -- so each is
+re-expressed under its own outcome (`Y2` and `Y1` respectively).
+
+```{r read-ex95}
+m_ml2 <- readModels(mplus_file("ex9.5_BAYES.out"), quiet = TRUE)
+```
+
+`coef_wrapper()` classifies the parameters of *both* slopes independently. The
+latent slope names `S1`/`S2` never reach the output: each slope's mean, its
+cross-level predictor `W`, and its residual variance are remapped to the
+within-person relationship it represents.
+
+```{r cw-ml2}
+coef_wrapper(m_ml2, params = c("regression", "expectation", "variability"))
+```
+
+In the fixed-effects table, the means of `s2` (the within-person effect of `y1`
+on `y2`) and `s1` (the within-person effect of `x2` on `y1`) appear in the
+**Within** section marked with a superscript letter. Each slope's cross-level
+predictor `W` becomes a relabelled interaction in **Between** (`W (between) x
+Y1 (within)` under `Y2`, `W (between) x X2 (within)` under `Y1`):
+
+```{r ct-ml2, message=TRUE}
+tbls2 <- coef_table_mplus(m_ml2)
+tbls2$fixed
+```
+
+The Random effects table lists both slopes' parameters, grouped by slope (`S1`
+then `S2`) and ordered predictor -> mean -> variance. Means and variances are
+relabelled by slope (`S1 Intercept`, `S1 Residual Variance`, ...); cross-level
+predictors keep their Mplus label (`S1<-W`, `S2<-W`):
+
+```{r re-ml2}
+tbls2$random
+```
+
+# Part 4: Growth models and the `|` operator
+
+The `|` operator serves multiple roles in Mplus. It declares **random slopes**
+(Parts 2--3), but also **growth factors** and **latent variable interactions**
+(`XWITH`). The package distinguishes these cases conservatively:
+
+- growth-factor declarations such as `i s | y1-y4 AT ...` trigger the
+  growth-specific table layout automatically; use `model_type = "growth"` to
+  force it, or `model_type = "default"` for the ordinary predictor x outcome
+  layout;
+- ON-form random slopes are still handled by the two-level fixed/random table
+  machinery in Parts 2--3;
+- `XWITH` interactions are **not** random effects -- the interaction term is an
+  ordinary predictor -- so they are detected and excluded from the random-effect
+  handling (Part 5).
+
+`ex6.12` is a single-level growth model with `TYPE = RANDOM`: two growth factors
+(`i`, `s`) declared with `|`, a random slope `st` for a time-varying covariate,
+and all three regressed on `x`:
+
+```default
+i s | y1-y4 AT a11-a14;   ! intercept & slope growth factors
+st | y1 ON a21;           ! random slope of a time-varying covariate
+st | y2 ON a22;
+st | y3 ON a23;
+st | y4 ON a24;
+i s st ON x;              ! growth factors / slope regressed on x
+```
+
+```{r read-ex612}
+m_growth <- readModels(mplus_file("ex6.12.out"), quiet = TRUE)
+```
+
+The slope detector recognises every `|` declaration, tagging the growth factors
+`kind = "growth"` (no outcome/predictor decomposition) and the random slope
+`st` `kind = "slope"`:
+
+```{r rs-growth}
+franzpak:::mplus_random_slopes(m_growth)
+```
+
+Because this model is **single-level** (no `%WITHIN%` / `%BETWEEN%` split), the
+multilevel re-expression used in Parts 2--3 does not apply. `coef_wrapper()`
+returns plain coefficients with each growth factor / slope keeping its own name
+as the outcome -- the regression DVs are no longer corrupted by the random-slope
+remapping:
+
+```{r cw-growth}
+coef_wrapper(m_growth)
+```
+
+`coef_table_mplus()` detects the growth-factor declaration and returns a
+growth-specific table. The predictors of the factors are shown first, followed
+by dedicated sections for factor means and variances:
+
+```{r ct-growth}
+coef_table_mplus(m_growth)
+```
+
+# Part 5: Latent variable interactions (`XWITH`)
+
+`ex5.13` is a single-level SEM with a latent interaction. The `|` here defines an
+interaction term `f1xf2` between two latent variables, which then predicts `f3`:
+
+```default
+f4 ON f3;
+f3 ON f1 f2;
+f1xf2 | f1 XWITH f2;   ! latent interaction term (NOT a random effect)
+f3 ON f1xf2;
+```
+
+```{r read-ex513}
+m_xwith <- readModels(mplus_file("ex5.13.out"), quiet = TRUE)
+```
+
+`XWITH` is detected by the `|` parser and **excluded** from the random effects,
+so the helper returns an empty tibble:
+
+```{r rs-xwith}
+franzpak:::mplus_random_slopes(m_xwith)
+```
+
+The interaction term is kept as an ordinary predictor. `F1XF2` appears as a
+predictor of `F3`, untouched by any random-effect remapping:
+
+```{r cw-xwith}
+coef_wrapper(m_xwith, params = "regression")
+```
+
+```{r ct-xwith}
+coef_table_mplus(m_xwith)
+```
+
+Use `label_replace` to give the interaction a readable name:
+
+```{r ct-xwith-labels}
+coef_table_mplus(
+  m_xwith,
+  label_replace = c("F1XF2" = "F1 x F2")
+)
+```
 
 # Argument quick reference
 
 | Argument | `coef_wrapper()` | `coef_table_mplus()` |
 |---|---|---|
-| `params` | parameter types to extract (default `"regression"`) | default `c("regression", "expectation")` for two-level, `"regression"` otherwise |
+| `params` | parameter types to extract (default `"regression"`) | default `c("regression", "expectation", "variability")` for two-level and growth tables, `"regression"` otherwise |
 | `type` | coefficient scale: `"un"`, `"stdyx"`, `"stdy"`, `"std"` | passed through to `coef_wrapper()` |
 | `bayes` | `NULL` auto-detect, or force `TRUE`/`FALSE` | same |
 | `display_type` | -- | `NULL` auto-detect, `"est_se"`, or `"est_ci"` |
 | `addci` | append `LowerCI`/`UpperCI` | (handled internally for `est_ci`) |
 | `label_replace` | rename DV/IV labels | rename DV/IV labels |
-| `na_replace` | -- | fill empty cells |
+| `na_replace` | -- | fill empty cells; default `"-"`, set `NULL` for true `NA` |
+| `predictor_order` | -- | order predictor (row) labels |
+| `model_type` | -- | `"auto"`, `"growth"`, or `"default"` |
+| `return_data` | -- | return the underlying wide tibble(s) instead of `gt` |
 | `sig_threshold`, `digits` | -- | star threshold / rounding |
 
 # Session info
