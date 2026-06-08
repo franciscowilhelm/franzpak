@@ -1,0 +1,25 @@
+TITLE:
+  Minimal reproduction of unnecessary outcome columns in coef_table_mplus;
+
+DATA:
+  FILE = unnecessary_columns.dat;
+
+VARIABLE:
+  NAMES = CLUSTER X W Y;
+  USEVARIABLES = X W Y;
+  CLUSTER = CLUSTER;
+
+ANALYSIS:
+  TYPE = TWOLEVEL;
+  ESTIMATOR = MLR;
+
+MODEL:
+  %WITHIN%
+    Y ON X W;
+
+  %BETWEEN%
+    X W Y;
+
+OUTPUT:
+  CINTERVAL;
+

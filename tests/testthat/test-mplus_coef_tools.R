@@ -156,6 +156,24 @@ test_that("coef_wrapper label_replace renames DV and IV labels", {
   expect_false(any(grepl("F3|F4", result$DV), na.rm = TRUE))
 })
 
+test_that("apply_label_replace resolves prefix-overlapping keys longest-first", {
+  # A short key that is a prefix of a longer variable name must not corrupt the
+  # longer name's label (the str_replace_all substring-bleed footgun). Both keys
+  # are present; each variable must get its own label.
+  repl <- c("M_PA" = "Positive affect", "M_PAW" = "Positive affect after work")
+  expect_equal(
+    apply_label_replace(c("M_PA", "M_PAW"), repl),
+    c("Positive affect", "Positive affect after work")
+  )
+  # Order in the input vector must not matter.
+  expect_equal(
+    apply_label_replace(c("M_PAW", "M_PA"), rev(repl)),
+    c("Positive affect after work", "Positive affect")
+  )
+  # NULL / empty pass through unchanged.
+  expect_equal(apply_label_replace(c("a", "b"), NULL), c("a", "b"))
+})
+
 test_that("coef_wrapper does not modify p-values regardless of bayes setting", {
   skip_if_not_installed("MplusAutomation")
 
@@ -789,6 +807,62 @@ test_that("coef_table_mplus gives no outcome column to predictor-only variables"
   expect_true(any(grepl("__Y1$", names(d))))
   expect_true(any(grepl("__Y2$", names(d))))
   expect_false(any(grepl("__X1$", names(d))))
+})
+
+test_that("coef_table_mplus drops outcomes that carry only a mean and a variance", {
+  skip_if_not_installed("MplusAutomation")
+  skip_if_not_installed("gt")
+
+  # A within-only predictor (X1) given both a between-level mean and a within-
+  # level variance, mimicking a latent variable whose variance is declared in the
+  # Within part purely for decomposition. Such a variable is regressed onto by
+  # nothing and must not earn an outcome column off its mean/variance alone.
+  m <- MplusAutomation::readModels(find_extdata("ex9.5_BAYES.out"), quiet = TRUE)
+  u <- m$parameters$unstandardized
+  mk <- function(header, level, est) {
+    r <- u[1, ]
+    r$paramHeader   <- header
+    r$param         <- "X1"
+    r$est           <- est
+    r$posterior_sd  <- 0.1
+    r$pval          <- 0.01
+    r$lower_2.5ci   <- est - 0.2
+    r$upper_2.5ci   <- est + 0.2
+    r$BetweenWithin <- level
+    r
+  }
+  m$parameters$unstandardized <- rbind(
+    u, mk("Means", "Between", 0.5), mk("Variances", "Within", 1.2)
+  )
+
+  d <- suppressMessages(coef_table_mplus(m)$fixed)[["_data"]]
+
+  expect_true(any(grepl("__Y1$", names(d))))
+  expect_true(any(grepl("__Y2$", names(d))))
+  expect_false(any(grepl("__X1$", names(d))))
+})
+
+test_that("relabelling the 'Means' token does not create spurious outcome columns", {
+  skip_if_not_installed("MplusAutomation")
+
+  # `label_replace` rewrites the structural token "Means". Expectation rows must
+  # be identified from the Mplus Label (not the relabelled IV), otherwise the
+  # between-level means of the predictors X and W make them spurious outcomes.
+  m <- MplusAutomation::readModels(
+    find_extdata("coef_table_mplus_unnecessary_columns/unnecessary_columns.out"),
+    quiet = TRUE
+  )
+  label_replace <- c("X" = "Predictor X", "W" = "Predictor W",
+                     "Y" = "Outcome Y", "Means" = "Mean / intercept")
+
+  d <- table_data(coef_table_mplus(m, label_replace = label_replace,
+                                   na_replace = NULL, return_data = TRUE))
+  outcomes <- unique(sub("^[^_]+_col__", "", grep("_col__", names(d), value = TRUE)))
+
+  expect_equal(outcomes, "Outcome Y")
+  expect_false(any(grepl("__Predictor (X|W)$", names(d))))
+  # The mean row still displays under its relabelled name.
+  expect_true("Mean / intercept" %in% d$IV)
 })
 
 test_that("coef_wrapper(addci=TRUE) leaves no NA intervals for Bayesian models", {

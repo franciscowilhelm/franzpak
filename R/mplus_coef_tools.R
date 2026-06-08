@@ -267,6 +267,52 @@ mplus_confint_from_primary <- function(model, params, type) {
   tibble(Label = paste(bw, label), LowerCI = d[[lo]], UpperCI = d[[hi]])
 }
 
+#' Identify mean/intercept/threshold (expectation) rows from the label (internal)
+#'
+#' Expectation rows must be detected from the Mplus parameter `Label`, not from
+#' the `IV` column: `label_replace` rewrites `DV`/`IV` (and a user may legitimately
+#' relabel the structural token `"Means"` to e.g. `"Mean / intercept"` for
+#' display), but it never touches `Label`. Matching on `IV` would therefore
+#' misclassify expectation rows whenever the user relabels these tokens, letting
+#' a predictor-only variable's mean qualify it as a spurious outcome column.
+#'
+#' The label of an expectation row ends in `<-Means`, `<-Intercepts`, or
+#' `<-Thresholds` (e.g. `"X<-Means"`). Re-expressed random-slope means share this
+#' label shape (`"S<-Means"`) but are directed within-person effects, not
+#' expectations; callers exclude them via the `within_avg_effect` flag.
+#'
+#' @param label Character vector of Mplus parameter labels.
+#' @return Logical vector, `TRUE` for expectation rows.
+#' @noRd
+is_expectation_label <- function(label) {
+  str_detect(label, "<-(Means|Intercepts|Thresholds)$")
+}
+
+#' Apply user label replacements without substring bleed (internal)
+#'
+#' `label_replace` maps raw Mplus variable names to display labels and is applied
+#' with [stringr::str_replace_all()], whose keys are regular expressions matched
+#' anywhere in the string. When one raw name is a prefix/substring of another
+#' (e.g. `M_PA` and `M_PAW`), the shorter key would otherwise rewrite part of the
+#' longer name and silently corrupt its label (`M_PAW` -> `<label for M_PA>W`),
+#' so the relabelled variable no longer matches the original -- breaking, for
+#' instance, `predictor_order` lookups and splitting a variable across labels.
+#'
+#' Replacements are therefore applied longest-key-first, so the most specific
+#' (longest) names resolve before shorter ones can match inside them. Keys are
+#' still treated as patterns, preserving intentional substring replacement for
+#' non-overlapping keys.
+#'
+#' @param x Character vector to relabel.
+#' @param label_replace Named character vector (`raw = display`), or `NULL`.
+#' @return `x` with replacements applied; unchanged when `label_replace` is `NULL`.
+#' @noRd
+apply_label_replace <- function(x, label_replace) {
+  if (is.null(label_replace) || length(label_replace) == 0) return(x)
+  ord <- order(nchar(names(label_replace)), decreasing = TRUE)
+  str_replace_all(x, label_replace[ord])
+}
+
 #' Format Mplus Model Coefficients
 #'
 #' Extracts regression (and optionally other) coefficients from an
@@ -477,8 +523,8 @@ coef_wrapper <- function(model, label_replace = NULL, params = c('regression'), 
 
   if (!is.null(label_replace)) {
     testcoefs <- testcoefs |>
-      mutate(DV = str_replace_all(DV, label_replace),
-             IV = str_replace_all(IV, label_replace))
+      mutate(DV = apply_label_replace(DV, label_replace),
+             IV = apply_label_replace(IV, label_replace))
   }
 
   testcoefs
@@ -599,26 +645,29 @@ mplus_growth_table <- function(coefs, factor_names, display, effective_bayes,
                                predictor_order = NULL,
                                return_data = FALSE) {
   fmt <- function(x) format(round(x, digits), nsmall = digits)
-  exp_terms <- c("Means", "Intercepts", "Thresholds")
 
   coefs <- coefs |>
     mutate(DV = trimws(DV), IV = trimws(IV)) |>
     filter(DV %in% factor_names)
 
   factor_names <- intersect(factor_names, unique(coefs$DV))
-  factor_regressed <- unique(coefs$DV[!coefs$IV %in% exp_terms &
+  # Expectation/variance rows are classified from the label (see
+  # is_expectation_label()), so user `label_replace` of structural tokens such as
+  # "Means" does not misroute them.
+  factor_regressed <- unique(coefs$DV[!is_expectation_label(coefs$Label) &
                                         !str_detect(coefs$Label, "<->")])
 
   coefs <- coefs |>
     mutate(
+      .expectation = is_expectation_label(Label),
       .variance = str_detect(Label, "<->") & DV == IV,
       group = dplyr::case_when(
-        IV %in% exp_terms ~ "Means",
-        .variance        ~ "Variances",
-        TRUE             ~ "Predictors"
+        .expectation ~ "Means",
+        .variance    ~ "Variances",
+        TRUE         ~ "Predictors"
       ),
       IV = dplyr::case_when(
-        IV %in% exp_terms ~ "Mean",
+        .expectation ~ "Mean",
         .variance & DV %in% factor_regressed ~ "Residual variance",
         .variance ~ "Variance",
         TRUE ~ IV
@@ -786,11 +835,13 @@ mplus_growth_table <- function(coefs, factor_names, display, effective_bayes,
 #' ordinary predictor x outcome layout. Growth tables show factor predictors,
 #' means, and variances in separate row sections.
 #'
-#' Only genuine outcomes (the dependent variable of a regression, random-slope
-#' mean, cross-level effect or variance) are given an outcome column. A variable
-#' that appears only as a predictor gets no column, even though Mplus estimates a
-#' between-level mean for every latent component; its mean/intercept row is
-#' dropped so it cannot create a spurious column.
+#' Only genuine outcomes -- variables a predictor is regressed *onto* (the
+#' dependent variable of a regression, a random-slope mean, or a cross-level
+#' effect) -- are given an outcome column. A variable described only by its own
+#' mean/intercept, variance, or covariance gets no column, even though Mplus
+#' estimates a between-level mean for every latent component and variances are
+#' often declared in the Within part for latent decomposition; all of its rows
+#' are dropped so it cannot create a spurious column.
 #'
 #' @param model Mplus model object from MplusAutomation.
 #' @param label_replace Named character vector for replacing DV/IV labels.
@@ -896,15 +947,40 @@ coef_table_mplus <- function(model, label_replace = NULL, params = NULL,
     coefs <- coefs |> filter(!(variance & !random_effect))
   }
 
-  # A variable earns an outcome column only if it is the dependent variable of a
-  # genuine effect (a regression, random-slope mean, cross-level effect or
-  # variance). Mplus estimates a between-level mean for every latent component,
-  # so a variable used only as a predictor would otherwise gain a spurious
-  # column off the back of its mean/intercept alone. Drop those mean/intercept
-  # rows; the mean/intercept of a real outcome is retained.
-  exp_terms    <- c("Means", "Intercepts", "Thresholds")
-  outcome_vars <- unique(coefs$DV[!coefs$IV %in% exp_terms])
-  coefs <- coefs |> filter(!(IV %in% exp_terms & !DV %in% outcome_vars))
+  # A variable earns an outcome column only if a predictor is regressed *onto*
+  # it -- a regression, a random-slope mean, or a cross-level effect. Parameters
+  # that merely describe a variable's own distribution do not qualify it: a
+  # mean/intercept, a variance, or a covariance is not a directed effect. This
+  # matters because Mplus estimates a between-level mean for every latent
+  # component, and variances are frequently declared in the Within part purely to
+  # enable latent decomposition; a variable that is only a predictor (or only
+  # decomposed) would otherwise gain a spurious outcome column carrying nothing
+  # but its mean and/or variance. Both expectation and undirected ("x <-> y":
+  # variances and covariances) rows are detected from the *label*, never from the
+  # label-replaced `IV` column, so the rule holds even when the user relabels the
+  # structural tokens (e.g. `label_replace = c("Means" = "Mean / intercept")`).
+  is_expectation <- is_expectation_label(coefs$Label)
+  is_undirected  <- str_detect(coefs$Label, "<->")
+
+  # Re-expressed random-slope means carry a `<-Means`/`<-Intercepts` label but are
+  # directed within-person effects (the average within effect of x on y), so they
+  # must still qualify their outcome.
+  if (twolevel) is_expectation <- is_expectation & !coefs$within_avg_effect
+
+  if (growth_model) {
+    # Growth/random-effect factors legitimately appear with only a mean and a
+    # variance and no predictor; they are tabulated by mplus_growth_table() below.
+    # Here only guard against a predictor-only variable gaining a column off a
+    # bare mean.
+    outcome_vars <- unique(coefs$DV[!is_expectation])
+    coefs <- coefs[!(is_expectation & !coefs$DV %in% outcome_vars), , drop = FALSE]
+  } else {
+    # Drop every row of a variable that is never regressed onto, so it gets no
+    # column (its mean/variance rows go with it). Real outcomes keep their
+    # mean/variance rows because they qualify via their predictor(s).
+    outcome_vars <- unique(coefs$DV[!is_expectation & !is_undirected])
+    coefs <- coefs[coefs$DV %in% outcome_vars, , drop = FALSE]
+  }
 
   # If intervals were requested but could not be retrieved, fall back to est/SE.
   if (fetch_ci && !all(c("LowerCI", "UpperCI") %in% names(coefs))) {
@@ -915,9 +991,7 @@ coef_table_mplus <- function(model, label_replace = NULL, params = NULL,
 
   if (growth_model) {
     factor_names <- mplus_growth_factors(model)
-    if (!is.null(label_replace)) {
-      factor_names <- str_replace_all(factor_names, label_replace)
-    }
+    factor_names <- apply_label_replace(factor_names, label_replace)
 
     if (length(factor_names) == 0) {
       warning("No `|` growth/random-effect factors were detected; using the default table layout.")
@@ -973,7 +1047,7 @@ coef_table_mplus <- function(model, label_replace = NULL, params = NULL,
       pred_by_slope <- stats::setNames(rs$predictor, rs$slope)
       slope_nm <- sub("(<->|<-).*$", "", coefs$Label)
       pred     <- unname(pred_by_slope[slope_nm])
-      if (!is.null(label_replace)) pred <- str_replace_all(pred, label_replace)
+      pred <- apply_label_replace(pred, label_replace)
       coefs$IV[cli] <- paste0(coefs$IV[cli], " (between) x ", pred[cli], " (within)")
     }
 

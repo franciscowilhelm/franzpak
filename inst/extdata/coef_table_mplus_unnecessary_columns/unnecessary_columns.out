@@ -1,0 +1,256 @@
+Mplus VERSION 8.10 (Mac)
+MUTHEN & MUTHEN
+06/08/2026   1:58 PM
+
+INPUT INSTRUCTIONS
+
+  TITLE:
+    Minimal reproduction of unnecessary outcome columns in coef_table_mplus;
+
+  DATA:
+    FILE = unnecessary_columns.dat;
+
+  VARIABLE:
+    NAMES = CLUSTER X W Y;
+    USEVARIABLES = X W Y;
+    CLUSTER = CLUSTER;
+
+  ANALYSIS:
+    TYPE = TWOLEVEL;
+    ESTIMATOR = MLR;
+
+  MODEL:
+    %WITHIN%
+      Y ON X W;
+
+    %BETWEEN%
+      X W Y;
+
+  OUTPUT:
+    CINTERVAL;
+
+
+
+
+INPUT READING TERMINATED NORMALLY
+
+
+
+
+Minimal reproduction of unnecessary outcome columns in coef_table_mplus;
+
+SUMMARY OF ANALYSIS
+
+Number of groups                                                 1
+Number of observations                                         300
+
+Number of dependent variables                                    1
+Number of independent variables                                  2
+Number of continuous latent variables                            0
+
+Observed dependent variables
+
+  Continuous
+   Y
+
+Observed independent variables
+   X           W
+
+Variables with special functions
+
+  Cluster variable      CLUSTER
+
+Estimator                                                      MLR
+Information matrix                                        OBSERVED
+Maximum number of iterations                                   100
+Convergence criterion                                    0.100D-05
+Maximum number of EM iterations                                500
+Convergence criteria for the EM algorithm
+  Loglikelihood change                                   0.100D-02
+  Relative loglikelihood change                          0.100D-05
+  Derivative                                             0.100D-03
+Minimum variance                                         0.100D-03
+Maximum number of steepest descent iterations                   20
+Maximum number of iterations for H1                           2000
+Convergence criterion for H1                             0.100D-03
+Optimization algorithm                                         EMA
+
+Input data file(s)
+  unnecessary_columns.dat
+Input data format  FREE
+
+
+SUMMARY OF DATA
+
+     Number of clusters                         60
+
+     Average cluster size        5.000
+
+     Estimated Intraclass Correlations for the Y Variables
+
+                Intraclass              Intraclass              Intraclass
+     Variable  Correlation   Variable  Correlation   Variable  Correlation
+
+     Y            0.437      X            0.437      W            0.210
+
+
+
+
+UNIVARIATE SAMPLE STATISTICS
+
+
+     UNIVARIATE HIGHER-ORDER MOMENT DESCRIPTIVE STATISTICS
+
+         Variable/         Mean/     Skewness/   Minimum/ % with                Percentiles
+        Sample Size      Variance    Kurtosis    Maximum  Min/Max      20%/60%    40%/80%    Median
+
+     Y                     0.004       0.080      -3.736    0.33%      -1.194     -0.282     -0.036
+             300.000       1.569      -0.186       3.361    0.33%       0.252      1.020
+     X                     0.276      -0.451      -4.147    0.33%      -0.930      0.096      0.422
+             300.000       1.754      -0.137       3.130    0.33%       0.723      1.445
+     W                     0.143       0.053      -2.791    0.33%      -0.874     -0.217      0.129
+             300.000       1.402      -0.243       3.631    0.33%       0.456      1.084
+
+
+THE MODEL ESTIMATION TERMINATED NORMALLY
+
+
+
+MODEL FIT INFORMATION
+
+Number of Free Parameters                       11
+
+Loglikelihood
+
+          H0 Value                       -1347.997
+          H0 Scaling Correction Factor      0.9664
+            for MLR
+          H1 Value                       -1346.734
+          H1 Scaling Correction Factor      0.9294
+            for MLR
+
+Information Criteria
+
+          Akaike (AIC)                    2717.993
+          Bayesian (BIC)                  2758.735
+          Sample-Size Adjusted BIC        2723.850
+            (n* = (n + 2) / 24)
+
+Chi-Square Test of Model Fit
+
+          Value                              3.052*
+          Degrees of Freedom                     4
+          P-Value                           0.5492
+          Scaling Correction Factor         0.8278
+            for MLR
+
+*   The chi-square value for MLM, MLMV, MLR, ULSMV, WLSM and WLSMV cannot be used
+    for chi-square difference testing in the regular way.  MLM, MLR and WLSM
+    chi-square difference testing is described on the Mplus website.  MLMV, WLSMV,
+    and ULSMV difference testing is done using the DIFFTEST option.
+
+RMSEA (Root Mean Square Error Of Approximation)
+
+          Estimate                           0.000
+
+CFI/TLI
+
+          CFI                                1.000
+          TLI                                1.000
+
+Chi-Square Test of Model Fit for the Baseline Model
+
+          Value                             98.475
+          Degrees of Freedom                     6
+          P-Value                           0.0000
+
+SRMR (Standardized Root Mean Square Residual)
+
+          Value for Within                   0.007
+          Value for Between                  0.095
+
+
+
+MODEL RESULTS
+
+                                                    Two-Tailed
+                    Estimate       S.E.  Est./S.E.    P-Value
+
+Within Level
+
+ Y          ON
+    X                  0.474      0.054      8.844      0.000
+    W                 -0.207      0.051     -4.065      0.000
+
+ Variances
+    X                  0.997      0.102      9.814      0.000
+    W                  1.104      0.088     12.474      0.000
+
+ Residual Variances
+    Y                  0.616      0.060     10.200      0.000
+
+Between Level
+
+ Means
+    Y                  0.004      0.120      0.032      0.974
+    X                  0.276      0.127      2.178      0.029
+    W                  0.143      0.093      1.545      0.122
+
+ Variances
+    Y                  0.668      0.130      5.142      0.000
+    X                  0.731      0.139      5.260      0.000
+    W                  0.303      0.087      3.492      0.000
+
+
+QUALITY OF NUMERICAL RESULTS
+
+     Condition Number for the Information Matrix              0.211E-03
+       (ratio of smallest to largest eigenvalue)
+
+
+CONFIDENCE INTERVALS OF MODEL RESULTS
+
+                  Lower .5%  Lower 2.5%    Lower 5%    Estimate    Upper 5%  Upper 2.5%   Upper .5%
+
+Within Level
+
+ Y        ON
+    X                0.336       0.369       0.386       0.474       0.562       0.579       0.612
+    W               -0.338      -0.306      -0.290      -0.207      -0.123      -0.107      -0.076
+
+ Variances
+    X                0.735       0.798       0.830       0.997       1.164       1.196       1.258
+    W                0.876       0.930       0.958       1.104       1.249       1.277       1.332
+
+ Residual Variances
+    Y                0.460       0.497       0.516       0.616       0.715       0.734       0.771
+
+Between Level
+
+ Means
+    Y               -0.305      -0.231      -0.193       0.004       0.201       0.239       0.313
+    X               -0.050       0.028       0.068       0.276       0.484       0.524       0.602
+    W               -0.095      -0.038      -0.009       0.143       0.296       0.325       0.382
+
+ Variances
+    Y                0.333       0.413       0.454       0.668       0.882       0.923       1.003
+    X                0.373       0.458       0.502       0.731       0.959       1.003       1.088
+    W                0.079       0.133       0.160       0.303       0.445       0.472       0.526
+
+
+     Beginning Time:  13:58:48
+        Ending Time:  13:58:48
+       Elapsed Time:  00:00:00
+
+
+
+MUTHEN & MUTHEN
+3463 Stoner Ave.
+Los Angeles, CA  90066
+
+Tel: (310) 391-9971
+Fax: (310) 391-8971
+Web: www.StatModel.com
+Support: Support@StatModel.com
+
+Copyright (c) 1998-2023 Muthen & Muthen

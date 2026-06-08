@@ -134,11 +134,13 @@ declaration such as \verb{i s | y1-y4 AT ...} are detected as growth models. Set
 ordinary predictor x outcome layout. Growth tables show factor predictors,
 means, and variances in separate row sections.
 
-Only genuine outcomes (the dependent variable of a regression, random-slope
-mean, cross-level effect or variance) are given an outcome column. A variable
-that appears only as a predictor gets no column, even though Mplus estimates a
-between-level mean for every latent component; its mean/intercept row is
-dropped so it cannot create a spurious column.
+Only genuine outcomes -- variables a predictor is regressed \emph{onto} (the
+dependent variable of a regression, a random-slope mean, or a cross-level
+effect) -- are given an outcome column. A variable described only by its own
+mean/intercept, variance, or covariance gets no column, even though Mplus
+estimates a between-level mean for every latent component and variances are
+often declared in the Within part for latent decomposition; all of its rows
+are dropped so it cannot create a spurious column.
 }
 }
 \examples{

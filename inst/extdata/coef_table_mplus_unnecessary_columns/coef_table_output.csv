@@ -1,0 +1,4 @@
+"level","IV","est_col__Outcome Y","se_col__Outcome Y","est_col__Predictor X","se_col__Predictor X","est_col__Predictor W","se_col__Predictor W"
+"Within","Predictor X"," 0.474*","0.054",,,,
+"Within","Predictor W","-0.207*","0.051",,,,
+"Between","Mean / intercept"," 0.004","0.120"," 0.276*","0.127"," 0.143","0.093"
