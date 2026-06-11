@@ -85,33 +85,74 @@ job_id <- bgjm_start_lavaan(
 ```
 
 `bgjm_start_lavaan()` returns at once, **without waiting** for the model to
-finish, so your session stays free. When you want the result, `bgjm_collect()`
-**blocks until the job is done** and returns it:
+finish, so your session stays free. The next section covers how to get the
+result back.
+
+# Retrieving results
+
+A job hands you back only a *job id* — a short string. The fitted model lives in
+the background process until you ask for it. There are three ways to interact
+with a job, depending on whether you want to wait:
+
+**1. `bgjm_result(job_id)` — get the model, waiting if needed.** This is the
+usual way to retrieve output. It returns the fitted object directly:
 
 ```{r}
 #| eval: false
-# Optional non-blocking check
-bgjm_status(job_id)            # "running", "finished", or "error"
-
-# Collect (waits if still running)
-collected <- bgjm_collect(job_id)
-fit <- collected$result
-
+fit <- bgjm_result(job_id)
 lavaan::fitMeasures(fit, c("cfi", "rmsea"))
 
-# Clean up when done
-bgjm_remove(job_id, delete_dir = TRUE)
+bgjm_remove(job_id, delete_dir = TRUE)   # clean up when done
 ```
 
-There is no manual polling step — `bgjm_collect()` waits for you. Use
-`bgjm_status()` only when you want a non-blocking peek.
+**2. `bgjm_collect(job_id)` — get the model *plus* its files and logs.** Use
+this when you also need the artifacts directory or log paths. It returns a list:
 
-The `collected` object contains:
+```{r}
+#| eval: false
+collected <- bgjm_collect(job_id)
+fit       <- collected$result            # the fitted model
+collected$artifacts_dir                  # files written during the run
+collected$stdout                         # path to captured stdout log
+```
 
-- `$result` — the fitted model object
-- `$job_dir` — the job's working directory
-- `$artifacts_dir` / `$artifact_files` — files written during the run
-- `$stdout` / `$stderr` — paths to the captured log files
+The `collected` list contains `result`, `job_dir`, `artifacts_dir`,
+`artifact_files`, `stdout`, and `stderr`. (`bgjm_result()` is simply a shortcut
+for `bgjm_collect(job_id)$result`.)
+
+**3. `bgjm_status()` / `bgjm_unresolved()` — check without waiting.** Use these
+when you do *not* want to block — e.g. to poll, or to decide whether a result is
+ready:
+
+```{r}
+#| eval: false
+bgjm_status(job_id)        # "running", "finished", or "error"
+bgjm_unresolved(job_id)    # TRUE while still running, FALSE once resolved
+```
+
+## Blocking is intentional
+
+Both `bgjm_result()` and `bgjm_collect()` **block**: if the job is still
+running, the call waits for it to finish rather than returning early or raising
+an error. This mirrors mirai's `m[]`. It is what you want when collecting:
+
+- in a **script**, you want the line to wait until the model is ready;
+- in a **Quarto / R Markdown report**, blocking is essential — otherwise the
+  document would render straight past your models before they finish, producing
+  empty or missing output.
+
+If you would rather *not* wait, check `bgjm_unresolved(job_id)` first and only
+collect once it returns `FALSE`. If a job *failed*, `bgjm_result()` /
+`bgjm_collect()` raise an informative error pointing at the job's logs (see
+[Handling failures](#handling-failures)).
+
+Convenient one-liner: pass `auto_remove = TRUE` to collect the result and drop
+the job (and its working directory) from the registry in one step:
+
+```{r}
+#| eval: false
+fit <- bgjm_result(job_id, auto_remove = TRUE)
+```
 
 # Examples
 
@@ -145,7 +186,7 @@ job_id <- bgjm_start_lavaan(
 
 # ... keep working ...
 
-fit <- bgjm_collect(job_id, auto_remove = TRUE)$result
+fit <- bgjm_result(job_id, auto_remove = TRUE)
 lavaan::parameterEstimates(fit, boot.ci.type = "bca.simple")
 ```
 
@@ -163,42 +204,42 @@ job_id <- bgjm_start_tidylpa(
   job_name = "iris-lpa"
 )
 
-result <- bgjm_collect(job_id, auto_remove = TRUE)
-result$result
+lpa <- bgjm_result(job_id, auto_remove = TRUE)
+lpa
 ```
 
 ## Several models at once
 
 Because jobs are non-blocking, launch competing models together and collect them
-afterwards. The daemon pool caps how many actually run in parallel:
+afterwards. The daemon pool caps how many actually run in parallel. With
+`purrr`, starting and collecting are each one line:
 
 ```{r}
 #| eval: false
+library(purrr)
+
 models <- list(
   "1-factor" = "g =~ x1 + x2 + x3 + x4 + x5 + x6 + x7 + x8 + x9",
   "2-factor" = "verbal =~ x1 + x2 + x3 + x4 + x5 + x6\n speed =~ x7 + x8 + x9",
   "3-factor" = "visual =~ x1 + x2 + x3\n textual =~ x4 + x5 + x6\n speed =~ x7 + x8 + x9"
 )
 
-jobs <- vapply(
-  names(models),
-  function(nm) bgjm_start_lavaan(
-    models[[nm]], HolzingerSwineford1939, "cfa", job_name = nm
-  ),
-  character(1)
+# Start every model in the background; imap passes each syntax (.x) and its
+# name (.y). Returns a named vector of job ids.
+jobs <- imap_chr(models, \(syntax, name)
+  bgjm_start_lavaan(syntax, HolzingerSwineford1939, "cfa", job_name = name))
+
+# Collect them — each call waits until that job is ready.
+fits <- map(jobs, bgjm_result)
+
+tibble::tibble(
+  model = names(fits),
+  cfi   = map_dbl(fits, lavaan::fitMeasures, "cfi"),
+  rmsea = map_dbl(fits, lavaan::fitMeasures, "rmsea"),
+  aic   = map_dbl(fits, lavaan::fitMeasures, "aic")
 )
 
-# Collect (each blocks until ready)
-fits <- lapply(jobs, function(j) bgjm_collect(j)$result)
-
-data.frame(
-  model = names(models),
-  cfi   = sapply(fits, lavaan::fitMeasures, "cfi"),
-  rmsea = sapply(fits, lavaan::fitMeasures, "rmsea"),
-  aic   = sapply(fits, lavaan::fitMeasures, "aic")
-)
-
-lapply(jobs, bgjm_remove, delete_dir = TRUE)
+walk(jobs, bgjm_remove, delete_dir = TRUE)
 ```
 
 # Mplus jobs and file artifacts

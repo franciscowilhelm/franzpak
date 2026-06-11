@@ -519,7 +519,16 @@ bgjm_status <- function(job_id) {
 
 #' Collect the result of a background job
 #'
-#' Blocks until the job has resolved, then returns its result and metadata.
+#' Returns the job's result together with its metadata. This **blocks** until
+#' the job has resolved, mirroring mirai's `m[]`: if the job is still running,
+#' the call waits for it rather than returning early. That is usually what you
+#' want in scripts and in Quarto / R Markdown reports, where returning early
+#' would let the document race past results that are not ready yet. For a
+#' non-blocking check use [bgjm_unresolved()] or [bgjm_status()]; to get only
+#' the result object (without metadata) use [bgjm_result()].
+#'
+#' If the job failed, this raises an informative error pointing at the job's
+#' stdout/stderr logs.
 #'
 #' @param job_id Identifier returned by a `bgjm_start_*()` function.
 #' @param auto_remove If `TRUE`, remove the job (and its directory) from the
@@ -527,6 +536,7 @@ bgjm_status <- function(job_id) {
 #'
 #' @return A list with the job `result` plus metadata (`artifacts_dir`,
 #'   `artifact_files`, `job_dir`, `stdout`, `stderr`).
+#' @seealso [bgjm_result()], [bgjm_unresolved()], [bgjm_status()]
 #' @export
 bgjm_collect <- function(job_id, auto_remove = FALSE) {
   j <- .bgjm_get(job_id)
@@ -568,6 +578,53 @@ bgjm_collect <- function(job_id, auto_remove = FALSE) {
   }
 
   out
+}
+
+#' Collect only the result object of a background job
+#'
+#' Convenience wrapper around [bgjm_collect()] that returns just the job's
+#' result -- the fitted model or object -- without the surrounding metadata
+#' list. Use this to avoid the easy-to-miss `bgjm_collect(job)$result` idiom.
+#'
+#' Like [bgjm_collect()] it **blocks** until the job resolves (mirroring mirai's
+#' `m[]`) and raises an informative error if the job failed. When you also need
+#' the artifacts directory or log paths, use [bgjm_collect()] instead.
+#'
+#' @inheritParams bgjm_collect
+#'
+#' @return The job's result object.
+#' @seealso [bgjm_collect()]
+#' @export
+#' @examplesIf interactive() && requireNamespace("lavaan", quietly = TRUE)
+#' \dontrun{
+#' job <- bgjm_start_lavaan("f1 =~ x1 + x2 + x3",
+#'                          lavaan::HolzingerSwineford1939, "cfa")
+#' fit <- bgjm_result(job, auto_remove = TRUE)
+#' }
+bgjm_result <- function(job_id, auto_remove = FALSE) {
+  bgjm_collect(job_id, auto_remove = auto_remove)$result
+}
+
+#' Check whether a job is still running (non-blocking)
+#'
+#' The franzpak analogue of [mirai::unresolved()]: returns `TRUE` while the job
+#' is still computing and `FALSE` once it has resolved (whether it finished or
+#' errored). Unlike [bgjm_collect()] / [bgjm_result()] this never blocks, so it
+#' is suitable for polling loops, progress displays, or deciding whether a
+#' result is ready before committing to a (blocking) collect.
+#'
+#' @param job_id Identifier returned by a `bgjm_start_*()` function.
+#'
+#' @return A length-one logical: `TRUE` if still running, otherwise `FALSE`.
+#' @seealso [bgjm_status()], [bgjm_collect()]
+#' @export
+#' @examplesIf interactive()
+#' \dontrun{
+#' if (!bgjm_unresolved(job)) fit <- bgjm_result(job)
+#' }
+bgjm_unresolved <- function(job_id) {
+  j <- .bgjm_get(job_id)
+  mirai::unresolved(j$mirai)
 }
 
 #' Terminate a running job

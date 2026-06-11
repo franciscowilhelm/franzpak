@@ -109,6 +109,30 @@ test_that("a failing job reports error status and errors on collect", {
   expect_error(bgjm_collect(job_id), "error")
 })
 
+test_that("bgjm_result returns the bare result and bgjm_unresolved is non-blocking", {
+  skip_if_no_mirai()
+  output_base <- file.path(tempdir(), sprintf("bgjm-result-%d", Sys.getpid()))
+
+  meta <- franzpak:::.bgjm_new_job("result-test", output_base)
+  job_id <- franzpak:::.bgjm_submit(meta, function() {
+    Sys.sleep(0.2)
+    list(a = 1, b = 2)
+  }, list())
+  on.exit(try(bgjm_remove(job_id, delete_dir = TRUE), silent = TRUE), add = TRUE)
+
+  # non-blocking check returns a single logical
+  u <- bgjm_unresolved(job_id)
+  expect_type(u, "logical")
+  expect_length(u, 1)
+
+  # bgjm_result blocks and returns the bare object (no metadata wrapper)
+  res <- bgjm_result(job_id)
+  expect_equal(res, list(a = 1, b = 2))
+
+  # once resolved, unresolved() is FALSE
+  expect_false(bgjm_unresolved(job_id))
+})
+
 test_that("bgjm_collect auto_remove drops the job from the registry", {
   skip_if_no_mirai()
   output_base <- file.path(tempdir(), sprintf("bgjm-autorm-%d", Sys.getpid()))

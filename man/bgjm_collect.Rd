@@ -17,5 +17,18 @@ A list with the job \code{result} plus metadata (\code{artifacts_dir},
 \code{artifact_files}, \code{job_dir}, \code{stdout}, \code{stderr}).
 }
 \description{
-Blocks until the job has resolved, then returns its result and metadata.
+Returns the job's result together with its metadata. This \strong{blocks} until
+the job has resolved, mirroring mirai's \code{m[]}: if the job is still running,
+the call waits for it rather than returning early. That is usually what you
+want in scripts and in Quarto / R Markdown reports, where returning early
+would let the document race past results that are not ready yet. For a
+non-blocking check use \code{\link[=bgjm_unresolved]{bgjm_unresolved()}} or \code{\link[=bgjm_status]{bgjm_status()}}; to get only
+the result object (without metadata) use \code{\link[=bgjm_result]{bgjm_result()}}.
+}
+\details{
+If the job failed, this raises an informative error pointing at the job's
+stdout/stderr logs.
+}
+\seealso{
+\code{\link[=bgjm_result]{bgjm_result()}}, \code{\link[=bgjm_unresolved]{bgjm_unresolved()}}, \code{\link[=bgjm_status]{bgjm_status()}}
 }
