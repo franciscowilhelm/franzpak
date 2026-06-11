@@ -259,12 +259,14 @@ bgjm_daemons <- function(n = 2L, ...) {
   .bgjm_ensure_daemons()
 
   # Detach both functions from the package namespace so they serialise to a
-  # clean daemon without requiring franzpak to be installed/loaded there. Both
-  # use only base R plus namespace-qualified (`pkg::fun`) calls, so baseenv()
-  # is sufficient for lookup.
+  # clean daemon without requiring franzpak to be installed/loaded there. Use
+  # globalenv() (not baseenv()): its parent is the daemon's search path, so
+  # packages attached by .bgjm_run_in_daemon() (via require()) remain visible.
+  # This matters for wrappers like blavaan's bsem(), which resolve the target
+  # function from the *caller's* environment via eval(match.call(), parent.frame()).
   run_fun <- .bgjm_run_in_daemon
-  environment(run_fun) <- baseenv()
-  environment(target_fun) <- baseenv()
+  environment(run_fun) <- globalenv()
+  environment(target_fun) <- globalenv()
 
   m <- mirai::mirai(
     run_fun(
@@ -394,9 +396,14 @@ bgjm_start_blavaan <- function(model_syntax, data,
                                seed = NULL) {
   blavaan_fun <- match.arg(blavaan_fun)
 
+  # blavaan's bsem/bcfa/bgrowth derive model.type from the *function symbol* in
+  # their own match.call() (stripping a leading "b"). We must therefore invoke
+  # them by name, not via a get()'d variable, or model.type comes out wrong.
+  # Build and evaluate a `blavaan::<fn>(model, data, ...)` call: the `::` form
+  # both resolves the function and gives the wrappers the symbol they expect.
   target_fun <- function(.syntax, .data, .fn, ...) {
-    f <- get(.fn, asNamespace("blavaan"))
-    f(.syntax, data = .data, ...)
+    fun <- call("::", as.name("blavaan"), as.name(.fn))
+    eval(as.call(c(fun, list(model = .syntax, data = .data, ...))))
   }
 
   meta <- .bgjm_new_job(

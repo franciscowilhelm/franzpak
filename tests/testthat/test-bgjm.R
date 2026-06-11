@@ -194,18 +194,29 @@ test_that("bgjm_start_lavaan returns a fitted lavaan object", {
 test_that("bgjm_start_blavaan returns a fitted blavaan object", {
   skip_if_no_mirai()
   skip_if_not_installed("blavaan")
+  skip_if_not_installed("lavaan")
   skip_on_cran()
   output_base <- file.path(tempdir(), sprintf("bgjm-blavaan-%d", Sys.getpid()))
 
+  # Classic Bollen (1989) political democracy model
   model_syntax <- "
-    performance =~ mpg + hp + qsec
+    ind60 =~ x1 + x2 + x3
+    dem60 =~ y1 + y2 + y3 + y4
+    dem65 =~ y5 + y6 + y7 + y8
+    dem60 ~ ind60
+    dem65 ~ ind60 + dem60
+    y1 ~~ y5
+    y2 ~~ y4 + y6
+    y3 ~~ y7
+    y4 ~~ y8
+    y6 ~~ y8
   "
   job_id <- bgjm_start_blavaan(
     model_syntax = model_syntax,
-    data = mtcars,
-    blavaan_fun = "bcfa",
-    n.chains = 1, burnin = 50, sample = 50,
-    job_name = "blavaan-bcfa-test",
+    data = lavaan::PoliticalDemocracy,
+    blavaan_fun = "bsem",
+    n.chains = 2, burnin = 100, sample = 100,
+    job_name = "blavaan-bsem-test",
     output_base = output_base
   )
   on.exit(try(bgjm_remove(job_id, delete_dir = TRUE), silent = TRUE), add = TRUE)
