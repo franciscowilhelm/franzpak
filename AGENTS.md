@@ -58,15 +58,23 @@ rmarkdown::render("README.Rmd")
   - Always uses `impute = "none"` (overrides scoreItems default)
   - Returns list with `$scores`, `$alpha`, and `$negative_index`
 
-**3. Background Job Management** (`R/callr_wrappers.R`)
-- Wraps `callr::r_bg()` for long-running model fits (lavaan, tidyLPA, Mplus)
-- In-memory job registry (`.bgjm_env$jobs`) tracks running jobs
+**3. Background Job Management** (`R/bgjm.R`, `R/zzz.R`)
+- Runs long-running model fits on the **mirai** engine (dedicated daemon pool,
+  compute profile `"franzpak"`, started lazily; configure via `bgjm_daemons()`
+  or `options(franzpak.bgjm_daemons=)`). Migrated off `callr`; design rationale
+  in `inst/quarto/background-jobs-internal.qmd`.
+- Adds an in-memory **named registry** (`.bgjm_env$jobs`) and **per-job
+  filesystem/artifact capture** (`.bgjm_run_in_daemon()` sets the working dir,
+  captures stdout/stderr to log files, relocates written files into `artifacts/`).
 - Key functions:
-  - `bgjm_start_lavaan()`, `bgjm_start_tidylpa()`: Launch background jobs
-  - `bgjm_list()`, `bgjm_status()`, `bgjm_poll()`: Monitor jobs
-  - `bgjm_collect()`: Retrieve results (can auto-remove via `auto_remove = TRUE`)
-  - `bgjm_kill()`, `bgjm_remove()`: Cleanup
-- Each job gets dedicated directory with stdout/stderr logs and artifacts folder
+  - `bgjm_start_lavaan()`, `bgjm_start_tidylpa()`, `bgjm_start_mplus()`: launch jobs
+  - `bgjm_list()`, `bgjm_status()`: monitor (non-blocking)
+  - `bgjm_collect()`: **blocks** until resolved (auto-remove via `auto_remove = TRUE`)
+  - `bgjm_kill()` (→ `mirai::stop_mirai()`), `bgjm_remove()`, `bgjm_daemons()`
+  - `bgjm_read_stdout()`, `bgjm_read_stderr()`
+- Shipped functions detached to `baseenv()` before submission (clean-daemon
+  serialisation). Status uses `mirai::is_error_value()` to catch interrupts/timeouts.
+- Removed in the migration: `bgjm_poll()`, `return_strategy`, `pass_data_as`.
 - **tidyLPA API**: Uses tidyLPA >= 1.0.0 API with `n_profiles` (not `K`), `models` (not `model`), and `package` (not `engine`)
 
 **4. Mplus Integration** (`R/mplus_coef_tools.R`)

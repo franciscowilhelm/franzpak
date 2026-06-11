@@ -58,15 +58,28 @@ rmarkdown::render("README.Rmd")
   - Always uses `impute = "none"` (overrides scoreItems default)
   - Returns list with `$scores`, `$alpha`, and `$negative_index`
 
-**3. Background Job Management** (`R/callr_wrappers.R`)
-- Wraps `callr::r_bg()` for long-running model fits (lavaan, tidyLPA, Mplus)
-- In-memory job registry (`.bgjm_env$jobs`) tracks running jobs
+**3. Background Job Management** (`R/bgjm.R`, `R/zzz.R`)
+- Runs long-running model fits on the **mirai** engine (a dedicated daemon pool,
+  compute profile `"franzpak"`, started lazily; configure via `bgjm_daemons()`
+  or `options(franzpak.bgjm_daemons=)`). Migrated off `callr` (see the internal
+  design vignette `inst/quarto/background-jobs-internal.qmd`).
+- Adds two things mirai does not: an in-memory **named registry**
+  (`.bgjm_env$jobs`) and **per-job filesystem/artifact capture** (the runner
+  `.bgjm_run_in_daemon()` sets the working dir, captures stdout/stderr to log
+  files, and relocates files written during the run into `artifacts/`).
 - Key functions:
-  - `bgjm_start_lavaan()`, `bgjm_start_tidylpa()`: Launch background jobs
-  - `bgjm_list()`, `bgjm_status()`, `bgjm_poll()`: Monitor jobs
-  - `bgjm_collect()`: Retrieve results (can auto-remove via `auto_remove = TRUE`)
-  - `bgjm_kill()`, `bgjm_remove()`: Cleanup
-- Each job gets dedicated directory with stdout/stderr logs and artifacts folder
+  - `bgjm_start_lavaan()`, `bgjm_start_tidylpa()`, `bgjm_start_mplus()`: launch jobs
+  - `bgjm_list()`, `bgjm_status()`: monitor (non-blocking)
+  - `bgjm_collect()`: **blocks** until resolved, retrieves result (`auto_remove =`)
+  - `bgjm_kill()` (→ `mirai::stop_mirai()`), `bgjm_remove()`, `bgjm_daemons()`
+  - `bgjm_read_stdout()`, `bgjm_read_stderr()`: per-job log files
+- Shipped functions are detached to `baseenv()` before submission so they run on
+  a clean daemon without franzpak loaded. Error/interrupt classification uses
+  `mirai::is_error_value()` (catches interrupts/timeouts, unlike `is_mirai_error()`).
+- No `bgjm_poll()` / `return_strategy` / `pass_data_as` (removed in the mirai migration).
+- `bgjm_start_mplus()` stages `.inp`/`.dat` into the job dir, runs `runModels()`
+  with `logFile=`/`showOutput=TRUE`/`quiet=FALSE`, captures `.out` + `mplus_run.log`,
+  returns parsed `readModels()`. Tests build fixtures via `mplusModeler(run = 0)`.
 - **tidyLPA API**: Uses tidyLPA >= 1.0.0 API with `n_profiles` (not `K`), `models` (not `model`), and `package` (not `engine`)
 
 **4. Mplus Integration** (`R/mplus_coef_tools.R`)

@@ -1,0 +1,238 @@
+---
+title: "Background Jobs: Internal Design Notes & mirai Assessment"
+subtitle: "Developer-facing — not a user how-to"
+format: html
+---
+
+> **Audience.** This is an *internal* design document for the package author, not
+> an end-user tutorial. For usage examples see `background-jobs.qmd`. The purpose
+> here is to (1) pin down precisely what the `bgjm_*` functions do, (2) state their
+> limits and failure modes honestly, and (3) decide how much of this layer is
+> genuinely useful versus redundant given the **mirai** package, for the package's
+> real aims: running compute-heavy `lavaan`, `tidyLPA`, and `MplusAutomation`
+> models asynchronously and in parallel.
+
+> **Status (implemented).** The migration recommended here has been carried out.
+> `bgjm_*` now runs on **mirai** (engine in `R/bgjm.R`; `mirai` moved to
+> `Imports`, `callr` dropped), a `bgjm_start_mplus()` launcher was added for
+> `MplusAutomation::runModels()`, and the per-job filesystem/artifact layer was
+> kept and ported. Sections 1–3 below describe the *pre-migration* `callr` design
+> and the analysis that motivated the change; sections 4–5 record the outcome and
+> current guidance. See `bgjm.R` for the live API.
+
+# 1. What the layer was (pre-migration)
+
+The original `bgjm_*` API (`R/callr_wrappers.R`, now removed) was a thin
+**job-management layer over `callr::r_bg()`**. Every "job" was a *transient,
+fresh R subprocess* that:
+
+- loads a declared set of packages,
+- `setwd()`s into a per-job directory and points `TMPDIR` there,
+- runs one target function (`do.call`) wrapped in `try()`,
+- diffs the job directory before/after to capture any files the call wrote, moves
+  them into `artifacts/`,
+- returns a small result list either inline (over `callr`'s IPC) or via an `.rds`
+  file on disk.
+
+A package-local environment `.bgjm_env$jobs` holds a **named, in-memory registry**
+of handles + metadata so callers can poll, collect, read logs, kill, and remove.
+
+## 1.1 Public surface
+
+| Function | Role | Notes / limits |
+|---|---|---|
+| `bgjm_start_lavaan()` | Launch `sem`/`cfa`/`lavaan` fit | Domain wrapper; data passed as object or `.rds` |
+| `bgjm_start_tidylpa()` | Launch `estimate_profiles()` | `package = "mclust"`/`"Mplus"`; Mplus here is an *LPA backend* only |
+| `bgjm_list()` | Registry snapshot as data frame | Empty `data.frame()` when none |
+| `bgjm_status()` | `"running"`/`"finished"`/`"error"` | Derived from `is_alive()` + exit status only |
+| `bgjm_poll()` | Pump `callr::poll()` events | Must be called for status to advance in scripts |
+| `bgjm_collect()` | Retrieve result list | Errors if still running; reads `.rds` if used |
+| `bgjm_kill()` | Signal-kill the child | Killed job then reports `"error"` |
+| `bgjm_remove()` | Drop from registry (+ optional dir delete) | Refuses to remove a *running* job |
+| `bgjm_read_stdout()` / `bgjm_read_stderr()` | Tail per-job log files | Files persist on disk |
+
+Internal: `.bgjm_start_job()` (generic launcher), `.bgjm_make_unique_id()`,
+`.bgjm_now_id()`, `%||%`.
+
+## 1.2 The genuinely distinctive feature
+
+Strip away the conveniences and **one mechanism is doing the real differentiating
+work: the before/after file-diff in `.bgjm_start_job()` that relocates files the
+child wrote into a per-job `artifacts/` directory** (callr_wrappers.R:137-184).
+For tools whose output *is files on disk* — Mplus `.inp`/`.out`/`.dat`, saved
+plots — this turns a messy working directory into an organized, per-job artifact
+folder with co-located `stdout.log`/`stderr.log`. Nothing in the async machinery
+itself is novel; this filesystem bookkeeping is.
+
+# 2. Limits and failure modes
+
+These are the things a user will eventually hit. Stated plainly so we don't
+oversell the layer.
+
+1. **No concurrency control / scheduling.** Each `bgjm_start_*()` spawns *one more*
+   `r_bg()` process immediately. Launch 20 models → 20 live R processes contending
+   for cores. There is no worker pool, no queue, no bound. The "Multiple Models in
+   Parallel" examples in the user vignette will oversubscribe the CPU on any
+   non-trivial fan-out. This is the most serious gap.
+
+2. **No warm pool — full startup cost per job.** Every job pays R startup +
+   `require()` of `lavaan`/`tidyLPA`/`MplusAutomation` from scratch. Fine for a few
+   long fits; wasteful for many short ones.
+
+3. **Registry is in-memory and session-bound.** `.bgjm_env$jobs` dies with the R
+   session. Combined with `supervise = TRUE` (callr_wrappers.R:218), children are
+   killed when the parent exits — so jobs do **not** survive an R restart. There is
+   no detach/reattach; "background" means "another process this session," not "a
+   durable job."
+
+4. **Coarse status & error model.** Status is inferred from process liveness +
+   exit code. A model that fits but throws inside `try()` comes back as
+   `ok = FALSE` wrapped in a `try-error`; a process that segfaults is just
+   `"error"`. There is no structured condition object, no stack trace, no warning
+   capture beyond the raw `stderr.log`.
+
+5. **No timeout, no cooperative cancellation.** The only control is `bgjm_kill()`
+   (a hard signal). No per-job time limit, no graceful stop.
+
+6. **Polling-only.** Progress requires the caller to drive `bgjm_poll()` in a
+   loop (the `wait_for_job()` helper). No event/promise integration, so this does
+   not compose with Shiny `ExtendedTask` or `promises`.
+
+7. **Single machine only.** No remote/SSH/HPC execution.
+
+8. **No `MplusAutomation::runModels()` launcher.** Despite the package's stated
+   Mplus focus, the only Mplus path is *through tidyLPA's LPA backend*. To run an
+   arbitrary `runModels()`/`mplusModeler()` job you must reach into the internal
+   `.bgjm_start_job()`. This is the biggest *functional* gap relative to the
+   package's goals.
+
+# 3. The mirai comparison
+
+[mirai](https://mirai.r-lib.org) is a minimalist async/parallel/distributed
+framework on `nanonext`. It is the natural reference point because it targets
+exactly the "run R work off the main thread, optionally in parallel" problem, and
+is far more mature and broadly tested.
+
+## 3.1 Feature matrix
+
+| Capability | `bgjm_*` | mirai |
+|---|---|---|
+| Async single eval | ✅ (`r_bg` per job) | ✅ `mirai(expr)` — no daemons needed |
+| Bounded parallel pool | ❌ unbounded processes | ✅ `daemons(n)` + scheduling |
+| Parallel map | ⚠️ manual loop of jobs | ✅ `mirai_map()` with `.progress/.stop/.flat` |
+| Warm worker reuse | ❌ fresh process each job | ✅ persistent daemons |
+| Structured errors | ❌ exit code + logs | ✅ error objects, stack traces |
+| Timeout | ❌ | ✅ `.timeout` |
+| Cancellation | ⚠️ hard kill only | ✅ `stop_mirai()` (cooperative) |
+| Promise/Shiny integration | ❌ | ✅ auto-promise, `ExtendedTask` |
+| Remote / HPC / SSH | ❌ | ✅ `ssh_config`/`cluster_config` |
+| Reproducible RNG across workers | ⚠️ single `seed` per job | ✅ `daemons(seed=)` per-call L'Ecuyer |
+| Per-job log *files* on disk | ✅ | ⚠️ `output=TRUE` to console, not per-job files |
+| **Auto file-artifact capture** | ✅ **(unique)** | ❌ (you manage the working dir yourself) |
+| Domain-specific signatures | ✅ (`lavaan`/`tidyLPA`) | ❌ (you write the expression) |
+| Dependency footprint | `callr` (already a dep) | adds `mirai`/`nanonext` |
+
+## 3.2 Where bgjm is simply redundant
+
+For the **async single fit**, the bgjm launchers are a one-line convenience over
+mirai, and mirai's version is more robust (structured errors, timeout):
+
+```{r}
+#| eval: false
+# bgjm
+job <- bgjm_start_lavaan(model_syntax, dat, "cfa")
+wait_for_job(job); fit <- bgjm_collect(job)$result
+
+# mirai equivalent — no daemons required, transient process per call
+m <- mirai(lavaan::cfa(syntax, data = d),
+           .args = list(syntax = model_syntax, d = dat))
+fit <- m[]                 # blocks; or unresolved(m) to poll non-blocking
+```
+
+For **parallel many-fits**, mirai is not just equivalent but *better*, because it
+bounds concurrency and schedules onto a fixed pool — exactly the safety the bgjm
+fan-out examples lack:
+
+```{r}
+#| eval: false
+daemons(4)                                   # 4 workers, not 1-per-model
+fits <- mirai_map(
+  list(m1 = s1, m2 = s2, m3 = s3),
+  function(syntax, d) lavaan::cfa(syntax, data = d),
+  .args = list(d = dat)
+)[.progress]
+daemons(0)
+```
+
+On the dimensions the package cares about for *execution* — robustness,
+scheduling, parallel ergonomics, error reporting, cancellation, distribution —
+mirai dominates. The bgjm launchers' remaining edge is purely the
+domain-specific signature (you don't have to namespace-qualify or pass `.args`).
+
+## 3.3 Where bgjm is *not* redundant
+
+The **artifact/filesystem layer** (§1.2) has no mirai counterpart. For
+`MplusAutomation::runModels()` — whose entire contract is "write `.inp`, invoke
+Mplus, read `.out` from a directory" — the per-job dir + automatic artifact
+capture + co-located logs is real value that mirai does not provide out of the
+box. With mirai you would re-implement the `setwd()`, the file diff, and the
+relocation yourself inside the expression.
+
+So the honest split is:
+
+- **Execution/scheduling:** mirai wins; bgjm's launchers are redundant and, on
+  fan-out, slightly *worse* (oversubscription).
+- **Per-job filesystem management for file-producing tools (Mplus):** bgjm is the
+  distinctive contribution.
+
+# 4. What was implemented
+
+The two fused responsibilities were separated exactly along the lines above.
+
+1. **mirai is now the execution/scheduling engine.** Jobs run on a dedicated
+   daemon pool (compute profile `"franzpak"`, started lazily; configurable via
+   `bgjm_daemons()` or `options(franzpak.bgjm_daemons=)`). A persistent pool is
+   used — not transient per-call processes — specifically because it unlocks
+   `bgjm_kill()` (→ `mirai::stop_mirai()`) and future timeouts, both of which
+   require a dispatcher, and because it amortises package-load startup. The
+   unbounded-process hazard is gone: concurrency is capped at the pool size.
+
+2. **The per-job filesystem/artifact layer was kept and ported.** The
+   `setwd()` + before/after file-diff + relocation into `artifacts/` and the
+   stdout/stderr-to-file capture now run *inside* the mirai expression
+   (`.bgjm_run_in_daemon()`), with `on.exit()` restoring working dir and `TMPDIR`
+   so reused daemons are not polluted. The shipped functions are detached to
+   `baseenv()` before submission so they serialise to a clean daemon without
+   requiring franzpak to be loaded there.
+
+3. **`bgjm_start_mplus()` was added** for `MplusAutomation::runModels()` — the
+   gap the old API left. It stages the `.inp`/`.dat` into the job dir, runs Mplus
+   there with `logFile=`, `showOutput=TRUE`, `quiet=FALSE`, captures `.out` +
+   `mplus_run.log` as artifacts, and returns the parsed `readModels()` object.
+
+API changes from the callr version (breaking, accepted given the 0.x status):
+`bgjm_poll()`, the `return_strategy`/`pass_data_as` arguments, and the
+`wait_for_job()` polling idiom are **gone** — `bgjm_collect()` now simply blocks
+until the job resolves, and mirai serialises results over IPC. Error/interrupt
+classification uses `mirai::is_error_value()` (not `is_mirai_error()`, which
+misses interrupts/timeouts).
+
+Cost paid: `mirai` (a light, `nanonext`-only dependency) is now in `Imports`;
+`callr` was removed from this module. The scheduling, error-handling, and
+cancellation gains justify it.
+
+# 5. Decision guide (current API)
+
+- **Compute-heavy `lavaan`/`tidyLPA`/Mplus fits, run async while you keep
+  working:** the `bgjm_start_*()` launchers — start, do other work, then
+  `bgjm_collect()` (blocks) or `bgjm_status()` (non-blocking). This is the
+  package's intended sweet spot.
+- **File-producing Mplus runs you want organized on disk:** `bgjm_start_mplus()`
+  (or `bgjm_start_tidylpa(package="Mplus")`); artifacts + logs land per job.
+- **Parallelism:** secondary here, but free — raise `bgjm_daemons(n)` and submit
+  several jobs; the pool bounds concurrency. For pure element-wise fan-out with
+  progress/early-stop, plain `mirai::mirai_map()` remains the better tool and the
+  `bgjm_*` registry adds nothing.
+- **Timeouts / Shiny / promises / remote-HPC:** use `mirai` directly; the
+  `bgjm_*` layer deliberately exposes only the registry + filesystem conveniences,
+  not the full mirai surface.

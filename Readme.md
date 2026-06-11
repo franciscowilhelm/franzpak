@@ -48,19 +48,25 @@ Therefore, users may find useful functions here for similar purposes.
 
 ### Background Job Management
 
-Functions for running long model fits (lavaan, tidyLPA) in isolated
-background R sessions:
+Functions for running long model fits (lavaan, tidyLPA, Mplus) in
+background R processes, built on the [mirai](https://mirai.r-lib.org)
+framework with a named registry and per-job file/artifact capture on
+top:
 
 - `bgjm_start_lavaan()` - Launch lavaan model (`sem()`, `cfa()`, or
   `lavaan()`) in background
 - `bgjm_start_tidylpa()` - Launch tidyLPA `estimate_profiles()` in
   background (supports mclust and Mplus packages; requires tidyLPA \>=
   1.0.0)
+- `bgjm_start_mplus()` - Run an Mplus input via
+  `MplusAutomation::runModels()`, capturing `.out`/log artifacts
+- `bgjm_daemons()` - Configure the background worker pool (size, or shut
+  down)
 - `bgjm_list()` - List all registered background jobs with their status
 - `bgjm_status()` - Query status of a specific job (`"running"`,
   `"finished"`, or `"error"`)
-- `bgjm_poll()` - Poll all background jobs to check for updates
-- `bgjm_collect()` - Retrieve results from a completed job
+- `bgjm_collect()` - Retrieve results from a job (blocks until it
+  resolves)
 - `bgjm_kill()` - Terminate a running job
 - `bgjm_remove()` - Remove job from registry (optionally delete working
   directory)
