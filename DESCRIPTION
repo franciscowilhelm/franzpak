@@ -12,6 +12,7 @@ Suggests:
     MplusAutomation,
     RSA,
     testthat (>= 3.0.0),
+    withr,
     lavaan,
     blavaan,
     tidyLPA (>= 1.0.0),

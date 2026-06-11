@@ -11,6 +11,10 @@
 ^exampleData$
 ^examples$
 ^private$
+^\.claude$
+^untracked_mplusexamples$
+^inst/quarto/.*_files$
+^inst/quarto/.*\.html$
 ^vignettes$
 ^vignettes/README\.md$
 ^vignettes/background-jobs\.html$
