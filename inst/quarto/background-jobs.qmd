@@ -316,6 +316,116 @@ result <- bgjm_collect(job_id)
 list.files(result$artifacts_dir)
 ```
 
+# Parallelism and CPU budgeting
+
+Two things can run in parallel at the same time, and it is easy to accidentally
+ask for far more CPU than you have:
+
+1. **The pool** runs several *jobs* at once — `bgjm_daemons(W)` gives `W` worker
+   processes (the *outer* layer).
+2. **A single job** can itself use several cores — lavaan can parallelise a
+   bootstrap, and Mplus can use multiple processors per run (the *inner* layer).
+
+If `W` workers each use `C` cores, peak demand is roughly **`W × C` cores**. Push
+that above your physical core count and everything slows down through
+contention. The rule of thumb:
+
+> Keep `workers × cores-per-job ≤ physical cores`, leaving one or two free for
+> the OS and your interactive session.
+
+```{r}
+#| eval: false
+parallelly::availableCores()   # or parallel::detectCores()
+```
+
+There are two sensible strategies; pick based on whether you have *many* fits or
+*a few big* ones.
+
+## Strategy A — many single-threaded jobs (maximise throughput)
+
+When you have lots of independent fits (model comparison, many bootstrap
+replications split across jobs), give all cores to the *pool* and keep each job
+single-threaded. With 14 cores:
+
+```{r}
+#| eval: false
+bgjm_daemons(12)               # 12 workers, each using 1 core
+# launch many jobs; the pool runs 12 at a time
+```
+
+## Strategy B — a few multi-threaded jobs (minimise latency per fit)
+
+When you have one or a few expensive models and want each to finish fast, keep
+the pool small and let each job parallelise internally so that
+`W × C` still fits your budget (e.g. `3 × 4 = 12`):
+
+```{r}
+#| eval: false
+bgjm_daemons(3)                # 3 workers ...
+```
+
+### lavaan bootstrap inside a job
+
+lavaan's bootstrap accepts `parallel`, `ncpus`, and `iseed`, and these pass
+straight through `bgjm_start_lavaan()`'s `...`:
+
+```{r}
+#| eval: false
+job <- bgjm_start_lavaan(
+  mediation_model, mediation_data, "sem",
+  se = "bootstrap", bootstrap = 1000,
+  parallel = "snow",           # see note below
+  ncpus = 4,                   # 4 cores for this one job
+  iseed = 123,                 # reproducible *parallel* bootstrap
+  job_name = "med-boot"
+)
+```
+
+Two notes:
+
+- **Prefer `parallel = "snow"` over `"multicore"` inside background jobs.** Jobs
+  already run in their own worker process; `"snow"` spawns fresh child processes,
+  whereas `"multicore"` *forks* the worker — and forking from a process that has
+  background threads (as the workers do) is fragile. `"snow"` is the safe choice
+  here.
+- For reproducibility of a *parallel* bootstrap, set lavaan's `iseed`. The
+  `seed` argument of `bgjm_start_*()` seeds the job's main process, which is not
+  enough once the bootstrap itself runs on several cores.
+
+### Mplus processors inside a job
+
+Mplus parallelises a single run via the `PROCESSORS` option in the input file's
+`ANALYSIS:` block — set it in the `.inp` you pass to `bgjm_start_mplus()`:
+
+```
+ANALYSIS:
+  PROCESSORS = 4;
+```
+
+Then keep the pool small (`bgjm_daemons(3)` with `PROCESSORS = 4` ≈ 12 cores).
+Because Mplus is an external program, there is no forking concern — it manages
+its own threads.
+
+## The hidden third layer: multithreaded BLAS
+
+Some builds of R use a multithreaded BLAS (OpenBLAS, Apple Accelerate, MKL). If
+each worker's BLAS also grabs several threads, you can oversubscribe without
+realising it. When running many workers, it is usually best to pin each worker's
+BLAS to a single thread:
+
+```{r}
+#| eval: false
+bgjm_daemons(12)
+# pin BLAS to 1 thread on every franzpak worker
+mirai::everywhere(
+  try(RhpcBLASctl::blas_set_num_threads(1L), silent = TRUE),
+  .compute = "franzpak"
+)
+```
+
+This keeps your `W × C` budget honest and is rarely a downside for the kinds of
+models run here (lavaan ML, mixture models), which are not BLAS-bound.
+
 # Monitoring, logs, and control
 
 ```{r}
@@ -370,15 +480,17 @@ bgjm_remove(job_id, delete_dir = TRUE)
   analyze <- function(model, data) {
     job <- bgjm_start_lavaan(model, data, "cfa")
     on.exit(bgjm_remove(job, delete_dir = TRUE), add = TRUE)
-    bgjm_collect(job)$result
+    bgjm_result(job)
   }
   ```
 
 - **Use persistent `output_base`** for Mplus / anything whose files you want to
   keep; keep `tempdir()` for quick exploratory fits you collect immediately.
 - **Use descriptive `job_name`s** so `bgjm_list()` is readable.
-- **Size the pool** with `bgjm_daemons(n)` to match your cores and how many
-  long jobs you expect to overlap.
+- **Size the pool** with `bgjm_daemons(n)` to match your cores — and mind
+  *nested* parallelism (lavaan bootstrap, Mplus `PROCESSORS`) so that
+  workers × cores-per-job stays within your CPU budget. See
+  [Parallelism and CPU budgeting](#parallelism-and-cpu-budgeting).
 
 # Notes and limits
 
