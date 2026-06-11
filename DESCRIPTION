@@ -13,6 +13,7 @@ Suggests:
     RSA,
     testthat (>= 3.0.0),
     lavaan,
+    blavaan,
     tidyLPA (>= 1.0.0),
     mclust,
     knitr,

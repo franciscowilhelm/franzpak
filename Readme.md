@@ -55,6 +55,8 @@ top:
 
 - `bgjm_start_lavaan()` - Launch lavaan model (`sem()`, `cfa()`, or
   `lavaan()`) in background
+- `bgjm_start_blavaan()` - Launch a Bayesian SEM (`bsem()`, `bcfa()`,
+  `bgrowth()`, or `blavaan()`) in background
 - `bgjm_start_tidylpa()` - Launch tidyLPA `estimate_profiles()` in
   background (supports mclust and Mplus packages; requires tidyLPA \>=
   1.0.0)

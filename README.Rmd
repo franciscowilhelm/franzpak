@@ -51,6 +51,7 @@ processes, built on the [mirai](https://mirai.r-lib.org) framework with a named
 registry and per-job file/artifact capture on top:
 
 - `bgjm_start_lavaan()` - Launch lavaan model (`sem()`, `cfa()`, or `lavaan()`) in background
+- `bgjm_start_blavaan()` - Launch a Bayesian SEM (`bsem()`, `bcfa()`, `bgrowth()`, or `blavaan()`) in background
 - `bgjm_start_tidylpa()` - Launch tidyLPA `estimate_profiles()` in background (supports mclust and Mplus packages; requires tidyLPA >= 1.0.0)
 - `bgjm_start_mplus()` - Run an Mplus input via `MplusAutomation::runModels()`, capturing `.out`/log artifacts
 - `bgjm_daemons()` - Configure the background worker pool (size, or shut down)

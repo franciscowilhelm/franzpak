@@ -346,6 +346,69 @@ bgjm_start_lavaan <- function(model_syntax, data,
   )
 }
 
+#' Start a blavaan (Bayesian SEM) background job
+#'
+#' Runs one of `blavaan::bsem()`, `blavaan::bcfa()`, `blavaan::bgrowth()`, or
+#' `blavaan::blavaan()` with the provided syntax and data on a background daemon.
+#' Because blavaan fits are MCMC and typically slow, they are a natural fit for
+#' background execution.
+#'
+#' @param model_syntax Character vector containing lavaan/blavaan model syntax.
+#' @param data Data frame passed to the blavaan function.
+#' @param blavaan_fun One of `"bsem"`, `"bcfa"`, `"bgrowth"`, or `"blavaan"`.
+#' @param ... Additional arguments forwarded to the selected blavaan function
+#'   (e.g. `n.chains`, `burnin`, `sample`, `target`, `mcmcfile`, `bcontrol`,
+#'   `seed`).
+#' @param job_name Optional friendly job name.
+#' @param output_base Directory where the job folder is created.
+#' @param seed Optional random seed for the job's main process. For reproducible
+#'   *sampling*, pass the sampler seed through `...` (blavaan's `seed`) instead;
+#'   `seed` here does not control the MCMC streams.
+#'
+#' @details The inner parallelism here is the number of MCMC **chains**. By
+#'   default blavaan runs chains sequentially; if you opt into parallel chains
+#'   (e.g. `bcontrol = list(cores = n.chains)`), note that on Unix this *forks*
+#'   the worker process — see the package's background-jobs vignette
+#'   ("Parallelism and CPU budgeting") for the recommended approach.
+#'
+#'   With `mcmcfile = TRUE`, blavaan writes the Stan/JAGS model and data to disk;
+#'   those files are captured into the job's `artifacts/` directory.
+#'
+#' @return Invisible job identifier string.
+#' @seealso [bgjm_start_lavaan()], [bgjm_collect()]
+#' @export
+#' @examplesIf interactive() && requireNamespace("blavaan", quietly = TRUE)
+#' \dontrun{
+#' job <- bgjm_start_blavaan(
+#'   model_syntax = "f1 =~ x1 + x2 + x3",
+#'   data = lavaan::HolzingerSwineford1939,
+#'   blavaan_fun = "bcfa",
+#'   n.chains = 2, burnin = 500, sample = 500
+#' )
+#' fit <- bgjm_result(job)
+#' }
+bgjm_start_blavaan <- function(model_syntax, data,
+                               blavaan_fun = c("bsem", "bcfa", "bgrowth",
+                                               "blavaan"), ...,
+                               job_name = NULL, output_base = tempdir(),
+                               seed = NULL) {
+  blavaan_fun <- match.arg(blavaan_fun)
+
+  target_fun <- function(.syntax, .data, .fn, ...) {
+    f <- get(.fn, asNamespace("blavaan"))
+    f(.syntax, data = .data, ...)
+  }
+
+  meta <- .bgjm_new_job(
+    job_name %||% sprintf("blavaan-%s", blavaan_fun), output_base
+  )
+  .bgjm_submit(
+    meta, target_fun,
+    list(.syntax = model_syntax, .data = data, .fn = blavaan_fun, ...),
+    packages = "blavaan", seed = seed
+  )
+}
+
 #' Start a tidyLPA background job
 #'
 #' Runs [tidyLPA::estimate_profiles()] with the supplied data and configuration

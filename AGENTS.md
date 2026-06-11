@@ -67,7 +67,7 @@ rmarkdown::render("README.Rmd")
   filesystem/artifact capture** (`.bgjm_run_in_daemon()` sets the working dir,
   captures stdout/stderr to log files, relocates written files into `artifacts/`).
 - Key functions:
-  - `bgjm_start_lavaan()`, `bgjm_start_tidylpa()`, `bgjm_start_mplus()`: launch jobs
+  - `bgjm_start_lavaan()`, `bgjm_start_blavaan()`, `bgjm_start_tidylpa()`, `bgjm_start_mplus()`: launch jobs
   - `bgjm_list()`, `bgjm_status()`: monitor (non-blocking)
   - `bgjm_collect()`: **blocks** until resolved (auto-remove via `auto_remove = TRUE`)
   - `bgjm_kill()` (→ `mirai::stop_mirai()`), `bgjm_remove()`, `bgjm_daemons()`

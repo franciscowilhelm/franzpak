@@ -191,6 +191,29 @@ test_that("bgjm_start_lavaan returns a fitted lavaan object", {
   expect_true(lavaan::lavInspect(collected$result, "converged"))
 })
 
+test_that("bgjm_start_blavaan returns a fitted blavaan object", {
+  skip_if_no_mirai()
+  skip_if_not_installed("blavaan")
+  skip_on_cran()
+  output_base <- file.path(tempdir(), sprintf("bgjm-blavaan-%d", Sys.getpid()))
+
+  model_syntax <- "
+    performance =~ mpg + hp + qsec
+  "
+  job_id <- bgjm_start_blavaan(
+    model_syntax = model_syntax,
+    data = mtcars,
+    blavaan_fun = "bcfa",
+    n.chains = 1, burnin = 50, sample = 50,
+    job_name = "blavaan-bcfa-test",
+    output_base = output_base
+  )
+  on.exit(try(bgjm_remove(job_id, delete_dir = TRUE), silent = TRUE), add = TRUE)
+
+  fit <- bgjm_result(job_id)
+  expect_s4_class(fit, "blavaan")
+})
+
 test_that("bgjm_start_tidylpa works with the mclust backend", {
   skip_if_no_mirai()
   skip_if_not_installed("tidyLPA")

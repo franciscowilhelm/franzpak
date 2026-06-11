@@ -38,6 +38,7 @@ The job system requires `mirai` (a hard dependency). Optional packages enable
 the model launchers:
 
 - `lavaan` — structural equation modeling
+- `blavaan` — Bayesian SEM (MCMC via Stan/JAGS)
 - `tidyLPA` (>= 1.0.0) + `mclust` — latent profile analysis
 - `MplusAutomation` (+ an Mplus installation) — Mplus models
 
@@ -190,6 +191,34 @@ fit <- bgjm_result(job_id, auto_remove = TRUE)
 lavaan::parameterEstimates(fit, boot.ci.type = "bca.simple")
 ```
 
+## Bayesian SEM with blavaan
+
+blavaan fits are MCMC and often slow — exactly the kind of model you want off the
+main thread. `bgjm_start_blavaan()` mirrors `bgjm_start_lavaan()` (`bsem`,
+`bcfa`, `bgrowth`, `blavaan`), forwarding sampler arguments through `...`:
+
+```{r}
+#| eval: false
+job_id <- bgjm_start_blavaan(
+  model_syntax = "
+    visual  =~ x1 + x2 + x3
+    textual =~ x4 + x5 + x6
+  ",
+  data = HolzingerSwineford1939,
+  blavaan_fun = "bcfa",
+  n.chains = 3, burnin = 1000, sample = 1000,
+  seed = 1:3,            # blavaan's own (per-chain) sampler seed
+  job_name = "hs-bcfa"
+)
+
+fit <- bgjm_result(job_id, auto_remove = TRUE)
+blavaan::summary(fit)
+```
+
+By default the chains run sequentially (one core); see
+[Parallelism and CPU budgeting](#parallelism-and-cpu-budgeting) for running
+several blavaan fits at once.
+
 ## Latent profile analysis with tidyLPA
 
 ```{r}
@@ -324,7 +353,8 @@ ask for far more CPU than you have:
 1. **The pool** runs several *jobs* at once — `bgjm_daemons(W)` gives `W` worker
    processes (the *outer* layer).
 2. **A single job** can itself use several cores — lavaan can parallelise a
-   bootstrap, and Mplus can use multiple processors per run (the *inner* layer).
+   bootstrap, Mplus can use multiple processors per run, and blavaan can run its
+   MCMC chains in parallel (the *inner* layer).
 
 If `W` workers each use `C` cores, peak demand is roughly **`W × C` cores**. Push
 that above your physical core count and everything slows down through
@@ -406,25 +436,32 @@ Then keep the pool small (`bgjm_daemons(3)` with `PROCESSORS = 4` ≈ 12 cores).
 Because Mplus is an external program, there is no forking concern — it manages
 its own threads.
 
-## The hidden third layer: multithreaded BLAS
+### blavaan MCMC chains inside a job
 
-Some builds of R use a multithreaded BLAS (OpenBLAS, Apple Accelerate, MKL). If
-each worker's BLAS also grabs several threads, you can oversubscribe without
-realising it. When running many workers, it is usually best to pin each worker's
-BLAS to a single thread:
+blavaan's inner parallelism is the number of MCMC **chains**. By default chains
+run *sequentially*, so a blavaan job uses one core unless you opt in. The
+simplest, safest pattern is to keep chains sequential and parallelise *across*
+fits with the pool:
 
 ```{r}
 #| eval: false
-bgjm_daemons(12)
-# pin BLAS to 1 thread on every franzpak worker
-mirai::everywhere(
-  try(RhpcBLASctl::blas_set_num_threads(1L), silent = TRUE),
-  .compute = "franzpak"
-)
+bgjm_daemons(8)                # 8 models at a time, each 1 core, chains in series
 ```
 
-This keeps your `W × C` budget honest and is rarely a downside for the kinds of
-models run here (lavaan ML, mixture models), which are not BLAS-bound.
+If you do want parallel chains within a job (`bcontrol = list(cores = n.chains)`
+for the Stan backend), the same caution as lavaan applies: on Unix this *forks*
+the worker process, which is fragile from inside a background worker. Prefer
+across-fit (pool) parallelism, and pass blavaan's own `seed` through `...` for
+reproducible chains.
+
+## What about multithreaded BLAS?
+
+A common worry with parallel R is a multithreaded BLAS (OpenBLAS, Apple
+Accelerate, MKL) silently spawning extra threads per worker. **For these
+backends it is not a concern:** Mplus and blavaan/Stan do their heavy linear
+algebra outside R's BLAS entirely, and lavaan and tidyLPA/mclust only touch it
+on small matrices where threading makes no difference. The layers worth
+budgeting are the pool and the inner mechanisms above — not BLAS.
 
 # Monitoring, logs, and control
 

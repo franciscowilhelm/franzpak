@@ -68,7 +68,7 @@ rmarkdown::render("README.Rmd")
   `.bgjm_run_in_daemon()` sets the working dir, captures stdout/stderr to log
   files, and relocates files written during the run into `artifacts/`).
 - Key functions:
-  - `bgjm_start_lavaan()`, `bgjm_start_tidylpa()`, `bgjm_start_mplus()`: launch jobs
+  - `bgjm_start_lavaan()`, `bgjm_start_blavaan()`, `bgjm_start_tidylpa()`, `bgjm_start_mplus()`: launch jobs
   - `bgjm_list()`, `bgjm_status()`: monitor (non-blocking)
   - `bgjm_collect()`: **blocks** until resolved, retrieves result (`auto_remove =`)
   - `bgjm_kill()` (→ `mirai::stop_mirai()`), `bgjm_remove()`, `bgjm_daemons()`
