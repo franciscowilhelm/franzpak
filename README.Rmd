@@ -56,7 +56,9 @@ registry and per-job file/artifact capture on top:
 - `bgjm_daemons()` - Configure the background worker pool (size, or shut down)
 - `bgjm_list()` - List all registered background jobs with their status
 - `bgjm_status()` - Query status of a specific job (`"running"`, `"finished"`, or `"error"`)
-- `bgjm_collect()` - Retrieve results from a job (blocks until it resolves)
+- `bgjm_unresolved()` - Non-blocking check: `TRUE` while a job is still running (mirrors `mirai::unresolved()`)
+- `bgjm_collect()` - Retrieve a job's result plus metadata (blocks until it resolves)
+- `bgjm_result()` - Retrieve just the result object of a job (blocks until it resolves)
 - `bgjm_kill()` - Terminate a running job
 - `bgjm_remove()` - Remove job from registry (optionally delete working directory)
 - `bgjm_read_stdout()` - Read captured standard output from a job
