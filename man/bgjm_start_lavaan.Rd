@@ -26,12 +26,18 @@ bgjm_start_lavaan(
 
 \item{job_name}{Optional friendly job name.}
 
-\item{output_base}{Directory where the job folder is created.}
+\item{output_base}{Directory where the job folder is created. Defaults to
+R's \code{tempdir()}, which is \strong{cleared when R exits} -- pass a persistent
+path (e.g. inside your project) to keep the job's logs and artifacts.}
 
-\item{seed}{Optional random seed.}
+\item{seed}{Optional random seed. This seeds the job's \emph{main process} only
+and does \strong{not} make a parallel bootstrap reproducible; for that, pass
+lavaan's own \code{iseed} through \code{...}.}
 }
 \value{
-Invisible job identifier string.
+Invisibly, a job identifier string -- a short handle, \strong{not} the
+fitted model. Assign it and pass it to \code{\link[=bgjm_result]{bgjm_result()}} (or
+\code{\link[=bgjm_collect]{bgjm_collect()}}) to retrieve the model once the job has finished.
 }
 \description{
 Runs one of \code{lavaan::sem()}, \code{lavaan::cfa()}, or \code{lavaan::lavaan()} with the

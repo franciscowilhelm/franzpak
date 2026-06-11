@@ -312,10 +312,16 @@ bgjm_daemons <- function(n = 2L, ...) {
 #' @param ... Additional arguments forwarded to the selected lavaan function
 #'   (e.g. `se = "bootstrap"`, `bootstrap = 1000`).
 #' @param job_name Optional friendly job name.
-#' @param output_base Directory where the job folder is created.
-#' @param seed Optional random seed.
+#' @param output_base Directory where the job folder is created. Defaults to
+#'   R's `tempdir()`, which is **cleared when R exits** -- pass a persistent
+#'   path (e.g. inside your project) to keep the job's logs and artifacts.
+#' @param seed Optional random seed. This seeds the job's *main process* only
+#'   and does **not** make a parallel bootstrap reproducible; for that, pass
+#'   lavaan's own `iseed` through `...`.
 #'
-#' @return Invisible job identifier string.
+#' @return Invisibly, a job identifier string -- a short handle, **not** the
+#'   fitted model. Assign it and pass it to [bgjm_result()] (or
+#'   [bgjm_collect()]) to retrieve the model once the job has finished.
 #' @seealso [bgjm_collect()], [bgjm_status()]
 #' @export
 #' @examplesIf interactive() && requireNamespace("lavaan", quietly = TRUE)
@@ -362,7 +368,9 @@ bgjm_start_lavaan <- function(model_syntax, data,
 #'   (e.g. `n.chains`, `burnin`, `sample`, `target`, `mcmcfile`, `bcontrol`,
 #'   `seed`).
 #' @param job_name Optional friendly job name.
-#' @param output_base Directory where the job folder is created.
+#' @param output_base Directory where the job folder is created. Defaults to
+#'   R's `tempdir()`, which is **cleared when R exits** -- pass a persistent
+#'   path (e.g. inside your project) to keep the job's logs and artifacts.
 #' @param seed Optional random seed for the job's main process. For reproducible
 #'   *sampling*, pass the sampler seed through `...` (blavaan's `seed`) instead;
 #'   `seed` here does not control the MCMC streams.
@@ -378,7 +386,9 @@ bgjm_start_lavaan <- function(model_syntax, data,
 #'   With `mcmcfile = TRUE`, blavaan writes the Stan/JAGS model and data to disk;
 #'   those files are captured into the job's `artifacts/` directory.
 #'
-#' @return Invisible job identifier string.
+#' @return Invisibly, a job identifier string -- a short handle, **not** the
+#'   fitted model. Assign it and pass it to [bgjm_result()] (or
+#'   [bgjm_collect()]) to retrieve the model once the job has finished.
 #' @seealso [bgjm_start_lavaan()], [bgjm_collect()]
 #' @export
 #' @examplesIf interactive() && requireNamespace("blavaan", quietly = TRUE)
@@ -430,10 +440,19 @@ bgjm_start_blavaan <- function(model_syntax, data,
 #'   `models`, `variances`, `covariances`).
 #' @param package `"mclust"` or `"Mplus"` backend (tidyLPA >= 1.0 naming).
 #' @param job_name Optional friendly job name.
-#' @param output_base Directory where the job folder is created.
-#' @param seed Optional random seed.
+#' @param output_base Directory where the job folder is created. Defaults to
+#'   R's `tempdir()`, which is **cleared when R exits** -- pass a persistent
+#'   path (e.g. inside your project) to keep the job's logs and artifacts.
+#' @param seed Optional random seed (seeds the job's main process).
 #'
-#' @return Invisible job identifier string.
+#' @details With `package = "Mplus"`, your data must use Mplus-compatible
+#'   variable names -- letters, digits, and underscores only, **no dots**
+#'   (rename `Sepal.Length` to `Sepal_Length`). Any files Mplus writes are
+#'   captured into the job's `artifacts/` directory.
+#'
+#' @return Invisibly, a job identifier string -- a short handle, **not** the
+#'   fitted model. Assign it and pass it to [bgjm_result()] (or
+#'   [bgjm_collect()]) to retrieve the result once the job has finished.
 #' @seealso [bgjm_collect()], [bgjm_start_mplus()]
 #' @export
 #' @examplesIf interactive() && requireNamespace("tidyLPA", quietly = TRUE)
@@ -473,22 +492,36 @@ bgjm_start_tidylpa <- function(data, n_profiles, ...,
 #' directory. The job result is the parsed model object from
 #' [MplusAutomation::readModels()].
 #'
-#' Mplus's own console output is streamed via `showOutput = TRUE`,
-#' `quiet = FALSE` and -- on Unix/macOS, where `runModels()` routes it through
-#' R -- captured to the job's stdout log (readable with [bgjm_read_stdout()]).
-#' The authoritative record remains the `.out` artifact.
+#' The authoritative record of the run is the `.out` artifact. The job's stdout
+#' log captures only [MplusAutomation::runModels()]'s own R-level messages (e.g.
+#' the command it issued); Mplus's live console stream (its TECH8 progress
+#' output) is **not** captured there -- it is written by the Mplus subprocess to
+#' the daemon's own stdout and is not redirected into the log. Read results from
+#' the `.out` artifact via the parsed [MplusAutomation::readModels()] result.
 #'
 #' @param target Path to an Mplus `.inp` file, or a directory containing `.inp`
-#'   (and accompanying `.dat`) files. Staged into the job directory before
-#'   running, so the original files are left untouched.
+#'   (and accompanying `.dat`) files. The input and its data file are staged
+#'   into the job directory before running, so the originals are left untouched.
+#'   Two things to watch: the data file must sit **beside** the `.inp` with a
+#'   recognised extension (`.dat`/`.csv`/`.txt`) -- a `FILE =` path in the
+#'   `.inp` pointing elsewhere will not be staged and the run will fail; and
+#'   pointing `target` at a *directory* runs **every** `.inp` it contains, so
+#'   give a single file's path to run just one model.
 #' @param ... Further arguments forwarded to [MplusAutomation::runModels()]
 #'   (e.g. `recursive`, `replaceOutfile`, `Mplus_command`). Do not pass
 #'   `target`, `logFile`, `showOutput`, or `quiet`; these are set internally.
 #' @param job_name Optional friendly job name.
-#' @param output_base Directory where the job folder is created.
-#' @param seed Optional random seed.
+#' @param output_base Directory where the job folder is created. Defaults to
+#'   R's `tempdir()`, which is **cleared when R exits**. For Mplus you almost
+#'   always want a persistent path here, since the point is usually to keep the
+#'   `.out` -- and avoid `auto_remove = TRUE` when collecting, as it deletes the
+#'   job directory, `.out` included.
+#' @param seed Optional random seed (seeds the job's main process; Mplus
+#'   controls its own RNG through the input file).
 #'
-#' @return Invisible job identifier string.
+#' @return Invisibly, a job identifier string -- a short handle, **not** the
+#'   fitted model. Assign it and pass it to [bgjm_result()] (or
+#'   [bgjm_collect()]) to retrieve the parsed model once the job has finished.
 #' @seealso [bgjm_collect()], [MplusAutomation::runModels()]
 #' @export
 #' @examplesIf interactive() && requireNamespace("MplusAutomation", quietly = TRUE)
@@ -524,6 +557,25 @@ bgjm_start_mplus <- function(target, ..., job_name = NULL,
   }
   file.copy(files, meta$dir, overwrite = TRUE)
 
+  # NOTE (future work -- live progress tracking, currently NOT wired up):
+  # An internal parser exists (`.bgjm_progress_*()` in R/bgjm_progress.R) that
+  # can turn Mplus's TECH8 console stream into a friendly status (Bayes
+  # iteration + PSR; mixture STARTING VALUE SET / BOOTSTRAP DRAW). It is not
+  # usable yet because that stream never reaches a file we can read:
+  #   * `runModels(showOutput = TRUE)` launches Mplus with `system("... mplus
+  #     x.inp")` (no stdout redirect), so the subprocess writes to the daemon's
+  #     OS-level fd 1. Our runner's `sink()` only redirects *R's* output, not a
+  #     child process's fd, so the stream bypasses the job's stdout log
+  #     entirely (only runModels' own R-level chatter lands there).
+  #   * The `.out` is no help either: Mplus writes an input-echo stub within
+  #     ~1 s and freezes it until the run ends, when it is overwritten with the
+  #     full results. So `.out` existence is also NOT a completion signal -- use
+  #     mirai resolution (bgjm_status()) for that.
+  # To make progress work, run Mplus with an OS-level stdout redirect, e.g.
+  # `system2(detectMplus(), shQuote(basename(inp)), stdout = stdout_log,
+  # stderr = stderr_log)` instead of runModels(showOutput=), then readModels().
+  # That streams the console to disk and lets bgjm_progress() (de-exported for
+  # now) light up. See the "live-flush" investigation notes.
   target_fun <- function(.run_dir, ...) {
     MplusAutomation::runModels(
       target = .run_dir,
@@ -603,8 +655,10 @@ bgjm_status <- function(job_id) {
 #' stdout/stderr logs.
 #'
 #' @param job_id Identifier returned by a `bgjm_start_*()` function.
-#' @param auto_remove If `TRUE`, remove the job (and its directory) from the
-#'   registry after collection.
+#' @param auto_remove If `TRUE`, remove the job from the registry **and delete
+#'   its working directory** after collection. Convenient for a fit you only
+#'   need in memory, but it also discards the job's logs and `artifacts/` -- do
+#'   not use it when you want to keep files on disk (e.g. an Mplus `.out`).
 #'
 #' @return A list with the job `result` plus metadata (`artifacts_dir`,
 #'   `artifact_files`, `job_dir`, `stdout`, `stderr`).

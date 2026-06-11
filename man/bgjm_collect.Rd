@@ -9,8 +9,10 @@ bgjm_collect(job_id, auto_remove = FALSE)
 \arguments{
 \item{job_id}{Identifier returned by a \verb{bgjm_start_*()} function.}
 
-\item{auto_remove}{If \code{TRUE}, remove the job (and its directory) from the
-registry after collection.}
+\item{auto_remove}{If \code{TRUE}, remove the job from the registry \strong{and delete
+its working directory} after collection. Convenient for a fit you only
+need in memory, but it also discards the job's logs and \verb{artifacts/} -- do
+not use it when you want to keep files on disk (e.g. an Mplus \code{.out}).}
 }
 \value{
 A list with the job \code{result} plus metadata (\code{artifacts_dir},

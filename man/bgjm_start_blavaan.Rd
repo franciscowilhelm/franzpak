@@ -27,14 +27,18 @@ bgjm_start_blavaan(
 
 \item{job_name}{Optional friendly job name.}
 
-\item{output_base}{Directory where the job folder is created.}
+\item{output_base}{Directory where the job folder is created. Defaults to
+R's \code{tempdir()}, which is \strong{cleared when R exits} -- pass a persistent
+path (e.g. inside your project) to keep the job's logs and artifacts.}
 
 \item{seed}{Optional random seed for the job's main process. For reproducible
 \emph{sampling}, pass the sampler seed through \code{...} (blavaan's \code{seed}) instead;
 \code{seed} here does not control the MCMC streams.}
 }
 \value{
-Invisible job identifier string.
+Invisibly, a job identifier string -- a short handle, \strong{not} the
+fitted model. Assign it and pass it to \code{\link[=bgjm_result]{bgjm_result()}} (or
+\code{\link[=bgjm_collect]{bgjm_collect()}}) to retrieve the model once the job has finished.
 }
 \description{
 Runs one of \code{blavaan::bsem()}, \code{blavaan::bcfa()}, \code{blavaan::bgrowth()}, or

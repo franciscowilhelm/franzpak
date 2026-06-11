@@ -26,17 +26,27 @@ bgjm_start_tidylpa(
 
 \item{job_name}{Optional friendly job name.}
 
-\item{output_base}{Directory where the job folder is created.}
+\item{output_base}{Directory where the job folder is created. Defaults to
+R's \code{tempdir()}, which is \strong{cleared when R exits} -- pass a persistent
+path (e.g. inside your project) to keep the job's logs and artifacts.}
 
-\item{seed}{Optional random seed.}
+\item{seed}{Optional random seed (seeds the job's main process).}
 }
 \value{
-Invisible job identifier string.
+Invisibly, a job identifier string -- a short handle, \strong{not} the
+fitted model. Assign it and pass it to \code{\link[=bgjm_result]{bgjm_result()}} (or
+\code{\link[=bgjm_collect]{bgjm_collect()}}) to retrieve the result once the job has finished.
 }
 \description{
 Runs \code{\link[tidyLPA:estimate_profiles]{tidyLPA::estimate_profiles()}} with the supplied data and configuration
 on a background daemon. When \code{package = "Mplus"}, any files written by the
 run are captured into the job's \verb{artifacts/} directory.
+}
+\details{
+With \code{package = "Mplus"}, your data must use Mplus-compatible
+variable names -- letters, digits, and underscores only, \strong{no dots}
+(rename \code{Sepal.Length} to \code{Sepal_Length}). Any files Mplus writes are
+captured into the job's \verb{artifacts/} directory.
 }
 \examples{
 \dontshow{if (interactive() && requireNamespace("tidyLPA", quietly = TRUE)) withAutoprint(\{ # examplesIf}

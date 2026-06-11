@@ -1,0 +1,7 @@
+TITLE: fixed-length bayes
+DATA: FILE = "d.dat";
+VARIABLE: NAMES = y1 y2 y3;
+ANALYSIS:
+  ESTIMATOR = BAYES;
+  FBITERATIONS = 10000;   ! fully fixed
+MODEL: f BY y1 y2 y3;

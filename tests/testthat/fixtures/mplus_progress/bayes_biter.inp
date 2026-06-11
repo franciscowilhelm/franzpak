@@ -1,0 +1,8 @@
+TITLE: bounded bayes
+DATA: FILE = "d.dat";
+VARIABLE: NAMES = y1 y2 y3;
+ANALYSIS:
+  ESTIMATOR = BAYES;
+  BITERATIONS = 30000 (2000);   ! max (min)
+  BCONVERGENCE = 0.01;
+MODEL: f BY y1 y2 y3;

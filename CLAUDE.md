@@ -70,6 +70,15 @@ rmarkdown::render("README.Rmd")
 - Key functions:
   - `bgjm_start_lavaan()`, `bgjm_start_blavaan()`, `bgjm_start_tidylpa()`, `bgjm_start_mplus()`: launch jobs
   - `bgjm_list()`, `bgjm_status()`: monitor (non-blocking)
+  - `bgjm_progress()`: **internal, not yet functional** (unexported groundwork
+    in `R/bgjm_progress.R`). The TECH8-stream parsers are correct and tested
+    against fixtures, but a live probe confirmed Mplus's console stream is never
+    captured into the job's stdout log — the subprocess writes it to the
+    daemon's OS-level fd 1, which `sink()` does not catch. Future work: redirect
+    the Mplus subprocess stdout at the OS level (`system2(..., stdout =)`) in
+    the runner instead of `runModels(showOutput = TRUE)` + `sink`; see the
+    future-work NOTE in `R/bgjm.R`. (`.out` is also no help: it is an input-echo
+    stub until the run ends, so its existence is not a completion signal either.)
   - `bgjm_collect()`: **blocks** until resolved, retrieves result (`auto_remove =`)
   - `bgjm_kill()` (→ `mirai::stop_mirai()`), `bgjm_remove()`, `bgjm_daemons()`
   - `bgjm_read_stdout()`, `bgjm_read_stderr()`: per-job log files

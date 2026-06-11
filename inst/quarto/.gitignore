@@ -1,1 +1,6 @@
 /.quarto/
+
+# Rendered Quarto outputs are build artifacts here; the published copies live in
+# vignettes/. Ignore any rendered HTML and its sidecar _files/ directory.
+*.html
+*_files/

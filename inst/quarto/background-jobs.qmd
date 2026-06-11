@@ -10,7 +10,7 @@ experimental.
 
 This vignette shows how to use the background-job functions (`bgjm_*`) to run
 long-running statistical models in background R processes, with practical
-examples using `lavaan`, `tidyLPA`, and `MplusAutomation`.
+examples using `lavaan`, `blavaan`, `tidyLPA`, and `MplusAutomation`.
 
 Under the hood the jobs run on the [mirai](https://mirai.r-lib.org) framework.
 On top of mirai, `franzpak` adds two conveniences:
@@ -52,6 +52,27 @@ library(lavaan)
 Jobs run on a dedicated pool of background workers (mirai daemons). The pool
 starts automatically on your first `bgjm_start_*()` call, but you can size it
 explicitly — and shut it down — with `bgjm_daemons()`:
+
+::: {.callout-note collapse="true"}
+## A quick glossary
+
+A few terms recur below. You can use the package without memorising them, but
+they help when reading the output of `bgjm_list()` or `bgjm_status()`:
+
+- **Daemon / worker** — a persistent background R process that actually runs
+  your model. The *pool* is the set of these workers; with `N` workers, up to
+  `N` jobs run at once and the rest wait their turn in a queue.
+- **Job** — one model fit you launched with a `bgjm_start_*()` function,
+  tracked under a name in franzpak's registry.
+- **Artifact** — a file a job writes to disk (e.g. an Mplus `.out`), collected
+  into that job's `artifacts/` folder.
+- **Blocking vs. non-blocking** — a *blocking* call (`bgjm_result()`,
+  `bgjm_collect()`) waits for the model to finish before returning; a
+  *non-blocking* one (`bgjm_status()`, `bgjm_unresolved()`) answers right away.
+- **Dispatcher / compute profile** — mirai's internals that route jobs to
+  workers. franzpak keeps its workers under their own profile (`"franzpak"`) so
+  they never clash with daemons you set up yourself. You can safely ignore this.
+:::
 
 ```{r}
 #| eval: false
@@ -147,6 +168,13 @@ collect once it returns `FALSE`. If a job *failed*, `bgjm_result()` /
 `bgjm_collect()` raise an informative error pointing at the job's logs (see
 [Handling failures](#handling-failures)).
 
+::: {.callout-note}
+While a blocking call waits, your R console sits at a frozen prompt with no
+progress bar until the model finishes — this is normal, **not** a hang. For a
+long fit, gauge progress first with `bgjm_unresolved(job_id)` (or peek at
+`bgjm_read_stdout(job_id)`) before committing to a blocking collect.
+:::
+
 Convenient one-liner: pass `auto_remove = TRUE` to collect the result and drop
 the job (and its working directory) from the registry in one step:
 
@@ -154,6 +182,15 @@ the job (and its working directory) from the registry in one step:
 #| eval: false
 fit <- bgjm_result(job_id, auto_remove = TRUE)
 ```
+
+::: {.callout-warning}
+`auto_remove = TRUE` also **deletes the job's working directory**, including its
+logs and `artifacts/`. It is perfect for a fit you only need in memory (a quick
+lavaan model), but do **not** use it when you want the files on disk — most
+importantly for Mplus runs, where it would delete the `.out` you came for. There,
+keep the default `auto_remove = FALSE` and call
+`bgjm_remove(job_id, delete_dir = FALSE)` to drop the job but keep its files.
+:::
 
 # Examples
 
@@ -190,6 +227,17 @@ job_id <- bgjm_start_lavaan(
 fit <- bgjm_result(job_id, auto_remove = TRUE)
 lavaan::parameterEstimates(fit, boot.ci.type = "bca.simple")
 ```
+
+::: {.callout-important}
+## `seed` does not cover *parallel* sampling
+
+The top-level `seed =` argument seeds the job's main R process. That is enough
+for a **serial** bootstrap (as above) or any single-threaded fit. But once the
+work itself runs across several cores — a *parallel* lavaan bootstrap, or
+blavaan's MCMC chains — you must set the sampler's own seed instead: lavaan's
+`iseed`, or blavaan's `seed`, passed through `...`. See
+[Parallelism and CPU budgeting](#parallelism-and-cpu-budgeting).
+:::
 
 ## Bayesian SEM with blavaan
 
@@ -254,9 +302,6 @@ job_id <- bgjm_start_blavaan(
 
 fit <- bgjm_result(job_id, auto_remove = TRUE)
 ```
-
-Many other arguments are available here to control estimation; see `?stan` or
-`?run.jags` for the possibilities.
 
 This works inside a background job and gives close to a linear speed-up (three
 chains on three cores run in roughly a third of the time). The one thing to keep
@@ -338,6 +383,17 @@ the `.inp` (and its `.dat`); the inputs are staged into the job directory, Mplus
 runs there, and the `.out` plus an `mplus_run.log` are captured as artifacts. The
 collected `$result` is the parsed `MplusAutomation::readModels()` object.
 
+::: {.callout-note}
+Two staging details worth knowing:
+
+- Your **data file must sit next to the `.inp`** with a recognised extension
+  (`.dat`/`.csv`/`.txt`). franzpak stages those files into the job directory; a
+  `FILE =` path in the `.inp` that points somewhere else will not be copied, and
+  the run fails with a "file not found" error.
+- Pointing `target` at a **directory runs every `.inp`** in it. To run a single
+  model, give the path to that one `.inp` file.
+:::
+
 ```{r}
 #| eval: false
 job_id <- bgjm_start_mplus(
@@ -349,11 +405,12 @@ out <- bgjm_collect(job_id)
 
 list.files(out$artifacts_dir)     # e.g. "model.out", "mplus_run.log"
 out$result                        # parsed model (readModels)
-
-# Mplus streams its own console log (showOutput = TRUE, quiet = FALSE);
-# on macOS/Linux it is captured to the job's stdout log:
-head(bgjm_read_stdout(job_id))
 ```
+
+The authoritative record of the run is the `.out` artifact (and the parsed
+`out$result`). Note that the job's stdout log holds only `runModels()`'s own
+R-level messages — **not** Mplus's live console output, which the Mplus
+subprocess writes to its own stdout rather than into the captured log.
 
 To keep the output files permanently, pass a persistent `output_base` and remove
 the job from the registry *without* deleting its directory:
@@ -392,6 +449,12 @@ list.files(result$artifacts_dir)
 ```
 
 # Parallelism and CPU budgeting
+
+Running jobs in parallel usually speeds your work up — but only up to a point.
+Ask for more cores than your machine has and the jobs end up fighting over them,
+so everything runs *slower* than if you had launched fewer at once. This section
+is about staying on the right side of that line; you only need it once you start
+running several jobs at a time, or one heavy job spread across many cores.
 
 Two things can run in parallel at the same time, and it is easy to accidentally
 ask for far more CPU than you have:
@@ -513,11 +576,9 @@ reproducible chains, pass blavaan's own `seed` through `...`.
 ## What about multithreaded BLAS?
 
 A common worry with parallel R is a multithreaded BLAS (OpenBLAS, Apple
-Accelerate, MKL) silently spawning extra threads per worker. **For these
-backends it is not a concern:** Mplus and blavaan/Stan do their heavy linear
-algebra outside R's BLAS entirely, and lavaan and tidyLPA/mclust only touch it
-on small matrices where threading makes no difference. The layers worth
-budgeting are the pool and the inner mechanisms above — not BLAS.
+Accelerate, MKL) silently spawning extra threads per worker. For the currently implemented
+backends (lavaan, blavaan, mclust, and Mplus this is not a concern). The layers worth
+budgeting are the pool and the inner mechanisms above, not BLAS.
 
 # Monitoring, logs, and control
 
@@ -527,7 +588,7 @@ bgjm_list()                       # registry snapshot (id, name, status, paths)
 
 bgjm_status(job_id)               # non-blocking status
 
-cat(bgjm_read_stdout(job_id), sep = "\n")   # captured stdout (incl. Mplus log)
+cat(bgjm_read_stdout(job_id), sep = "\n")   # captured stdout (R-level messages)
 cat(bgjm_read_stderr(job_id), sep = "\n")   # captured messages/warnings
 
 bgjm_kill(job_id)                 # cancel a running job (mirai::stop_mirai)
@@ -592,9 +653,11 @@ bgjm_remove(job_id, delete_dir = TRUE)
   session*, not a job that survives a restart.
 - `bgjm_collect()` blocks; use `bgjm_status()` / `bgjm_list()` for non-blocking
   checks.
-- The Mplus console log is captured to stdout only where `runModels()` routes it
-  through R (macOS/Linux). The authoritative record is always the `.out`
-  artifact.
+- Mplus's live console output (its TECH8 progress stream) is **not** captured to
+  the job's stdout log — the Mplus subprocess writes it to its own stdout, which
+  the runner does not redirect into the log. The stdout log holds only
+  `runModels()`'s R-level messages; the authoritative record is always the
+  `.out` artifact.
 - For parallel *maps* with progress bars / early-stop, or timeouts, Shiny, and
   remote execution, prefer `mirai` directly.
 

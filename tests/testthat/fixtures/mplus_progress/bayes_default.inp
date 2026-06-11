@@ -1,0 +1,8 @@
+TITLE: default bayes (no FBIT/BIT)
+DATA: FILE = "d.dat";
+VARIABLE: NAMES = y1 y2 y3;
+ANALYSIS:
+  ESTIMATOR = BAYES;
+  PROCESSORS = 4;
+MODEL: f BY y1 y2 y3;
+OUTPUT: TECH1;

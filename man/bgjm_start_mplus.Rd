@@ -14,8 +14,13 @@ bgjm_start_mplus(
 }
 \arguments{
 \item{target}{Path to an Mplus \code{.inp} file, or a directory containing \code{.inp}
-(and accompanying \code{.dat}) files. Staged into the job directory before
-running, so the original files are left untouched.}
+(and accompanying \code{.dat}) files. The input and its data file are staged
+into the job directory before running, so the originals are left untouched.
+Two things to watch: the data file must sit \strong{beside} the \code{.inp} with a
+recognised extension (\code{.dat}/\code{.csv}/\code{.txt}) -- a \verb{FILE =} path in the
+\code{.inp} pointing elsewhere will not be staged and the run will fail; and
+pointing \code{target} at a \emph{directory} runs \strong{every} \code{.inp} it contains, so
+give a single file's path to run just one model.}
 
 \item{...}{Further arguments forwarded to \code{\link[MplusAutomation:runModels]{MplusAutomation::runModels()}}
 (e.g. \code{recursive}, \code{replaceOutfile}, \code{Mplus_command}). Do not pass
@@ -23,12 +28,19 @@ running, so the original files are left untouched.}
 
 \item{job_name}{Optional friendly job name.}
 
-\item{output_base}{Directory where the job folder is created.}
+\item{output_base}{Directory where the job folder is created. Defaults to
+R's \code{tempdir()}, which is \strong{cleared when R exits}. For Mplus you almost
+always want a persistent path here, since the point is usually to keep the
+\code{.out} -- and avoid \code{auto_remove = TRUE} when collecting, as it deletes the
+job directory, \code{.out} included.}
 
-\item{seed}{Optional random seed.}
+\item{seed}{Optional random seed (seeds the job's main process; Mplus
+controls its own RNG through the input file).}
 }
 \value{
-Invisible job identifier string.
+Invisibly, a job identifier string -- a short handle, \strong{not} the
+fitted model. Assign it and pass it to \code{\link[=bgjm_result]{bgjm_result()}} (or
+\code{\link[=bgjm_collect]{bgjm_collect()}}) to retrieve the parsed model once the job has finished.
 }
 \description{
 Runs an existing Mplus input on a background daemon and captures its output.
@@ -39,10 +51,12 @@ directory. The job result is the parsed model object from
 \code{\link[MplusAutomation:readModels]{MplusAutomation::readModels()}}.
 }
 \details{
-Mplus's own console output is streamed via \code{showOutput = TRUE},
-\code{quiet = FALSE} and -- on Unix/macOS, where \code{runModels()} routes it through
-R -- captured to the job's stdout log (readable with \code{\link[=bgjm_read_stdout]{bgjm_read_stdout()}}).
-The authoritative record remains the \code{.out} artifact.
+The authoritative record of the run is the \code{.out} artifact. The job's stdout
+log captures only \code{\link[MplusAutomation:runModels]{MplusAutomation::runModels()}}'s own R-level messages (e.g.
+the command it issued); Mplus's live console stream (its TECH8 progress
+output) is \strong{not} captured there -- it is written by the Mplus subprocess to
+the daemon's own stdout and is not redirected into the log. Read results from
+the \code{.out} artifact via the parsed \code{\link[MplusAutomation:readModels]{MplusAutomation::readModels()}} result.
 }
 \examples{
 \dontshow{if (interactive() && requireNamespace("MplusAutomation", quietly = TRUE)) withAutoprint(\{ # examplesIf}
