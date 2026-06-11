@@ -44,10 +44,11 @@ background execution.
 }
 \details{
 The inner parallelism here is the number of MCMC \strong{chains}. By
-default blavaan runs chains sequentially; if you opt into parallel chains
-(e.g. \code{bcontrol = list(cores = n.chains)}), note that on Unix this \emph{forks}
-the worker process — see the package's background-jobs vignette
-("Parallelism and CPU budgeting") for the recommended approach.
+default blavaan runs chains sequentially; pass \code{bcontrol = list(cores = n.chains)} (Stan backend) to run them in parallel, which works inside a
+background job and gives close to a linear speed-up. Mind the core budget:
+a job using \code{cores = k} consumes \code{k} cores, so size the daemon pool so that
+\verb{workers x cores-per-job} stays within your CPU count. See the package's
+background-jobs vignette ("Parallelism and CPU budgeting").
 
 With \code{mcmcfile = TRUE}, blavaan writes the Stan/JAGS model and data to disk;
 those files are captured into the job's \verb{artifacts/} directory.

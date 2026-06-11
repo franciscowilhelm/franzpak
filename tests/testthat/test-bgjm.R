@@ -225,6 +225,35 @@ test_that("bgjm_start_blavaan returns a fitted blavaan object", {
   expect_s4_class(fit, "blavaan")
 })
 
+test_that("bgjm_start_blavaan runs parallel MCMC chains inside a job", {
+  skip_if_no_mirai()
+  skip_if_not_installed("blavaan")
+  skip_if_not_installed("lavaan")
+  skip_if_not_installed("rstan")
+  skip_on_cran()
+  output_base <- file.path(tempdir(), sprintf("bgjm-blavaan-par-%d", Sys.getpid()))
+
+  # Parallel chains use parallel::mclapply (fork) on Unix; this guards that
+  # forking from inside a mirai daemon still produces a valid fit.
+  job_id <- bgjm_start_blavaan(
+    model_syntax = "
+      ind60 =~ x1 + x2 + x3
+      dem60 =~ y1 + y2 + y3 + y4
+      dem60 ~ ind60
+    ",
+    data = lavaan::PoliticalDemocracy,
+    blavaan_fun = "bsem",
+    n.chains = 2, burnin = 100, sample = 100,
+    bcontrol = list(cores = 2),
+    job_name = "blavaan-parallel-test",
+    output_base = output_base
+  )
+  on.exit(try(bgjm_remove(job_id, delete_dir = TRUE), silent = TRUE), add = TRUE)
+
+  fit <- bgjm_result(job_id)
+  expect_s4_class(fit, "blavaan")
+})
+
 test_that("bgjm_start_tidylpa works with the mclust backend", {
   skip_if_no_mirai()
   skip_if_not_installed("tidyLPA")

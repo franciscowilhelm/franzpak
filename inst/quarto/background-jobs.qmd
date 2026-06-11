@@ -232,9 +232,38 @@ fit <- bgjm_result(job_id, auto_remove = TRUE)
 summary(fit)
 ```
 
-By default the chains run sequentially (one core); see
-[Parallelism and CPU budgeting](#parallelism-and-cpu-budgeting) for running
-several blavaan fits at once.
+## Parallelising the chains
+
+Speed is always an issue when sampling via MCMC, especially with software like
+Stan or JAGS. On a machine with multiple cores the estimation can be sped up by
+sending each MCMC chain to a separate core. blavaan exposes this through the
+`bcontrol` argument — a list whose elements correspond to `stan()` or
+`run.jags()` arguments — which passes straight through `bgjm_start_blavaan()`'s
+`...`. For Stan, parallelise the chains with `bcontrol = list(cores = 3)`:
+
+```{r}
+#| eval: false
+job_id <- bgjm_start_blavaan(
+  model_syntax = model,
+  data = PoliticalDemocracy,
+  blavaan_fun = "bsem",
+  n.chains = 3,
+  bcontrol = list(cores = 3),   # one core per chain
+  job_name = "polidem-bsem-par"
+)
+
+fit <- bgjm_result(job_id, auto_remove = TRUE)
+```
+
+Many other arguments are available here to control estimation; see `?stan` or
+`?run.jags` for the possibilities.
+
+This works inside a background job and gives close to a linear speed-up (three
+chains on three cores run in roughly a third of the time). The one thing to keep
+in mind is the **core budget**: a job using `cores = 3` consumes three cores, so
+size the pool accordingly (`bgjm_daemons(W)` with `W × 3 ≤` your cores). See
+[Parallelism and CPU budgeting](#parallelism-and-cpu-budgeting) for the trade-off
+between parallelising *within* a fit and running several fits at once.
 
 ## Latent profile analysis with tidyLPA
 
@@ -456,20 +485,30 @@ its own threads.
 ### blavaan MCMC chains inside a job
 
 blavaan's inner parallelism is the number of MCMC **chains**. By default chains
-run *sequentially*, so a blavaan job uses one core unless you opt in. The
-simplest, safest pattern is to keep chains sequential and parallelise *across*
-fits with the pool:
+run *sequentially*, so a blavaan job uses one core unless you opt in. To run the
+chains in parallel, pass `bcontrol = list(cores = n.chains)` (Stan backend) —
+this works reliably inside a background job and gives close to a linear
+speed-up:
+
+```{r}
+#| eval: false
+# one big fit, three chains in parallel
+bgjm_start_blavaan(model, data, "bsem", n.chains = 3,
+                   bcontrol = list(cores = 3))
+```
+
+So you have the usual choice. Parallelise *within* a fit (few jobs, each using
+`cores` cores) for the lowest latency on a single model, or keep chains
+sequential and parallelise *across* fits with the pool for maximum throughput
+when you have many models:
 
 ```{r}
 #| eval: false
 bgjm_daemons(8)                # 8 models at a time, each 1 core, chains in series
 ```
 
-If you do want parallel chains within a job (`bcontrol = list(cores = n.chains)`
-for the Stan backend), the same caution as lavaan applies: on Unix this *forks*
-the worker process, which is fragile from inside a background worker. Prefer
-across-fit (pool) parallelism, and pass blavaan's own `seed` through `...` for
-reproducible chains.
+Either way, keep `workers × cores-per-job` within your CPU budget. For
+reproducible chains, pass blavaan's own `seed` through `...`.
 
 ## What about multithreaded BLAS?
 
