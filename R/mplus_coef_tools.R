@@ -843,6 +843,25 @@ mplus_growth_table <- function(coefs, factor_names, display, effective_bayes,
 #' often declared in the Within part for latent decomposition; all of its rows
 #' are dropped so it cannot create a spurious column.
 #'
+#' ## MODEL CONSTRAINT (NEW) parameters
+#'
+#' Parameters declared with `NEW(...)` in `MODEL CONSTRAINT` (e.g. the
+#' response-surface parameters a1--a5 of an RSA model) have no dependent
+#' variable, so they do not fit the predictor x outcome layout and are omitted by
+#' default. Set `constraints = TRUE` (or pass a named mapping) to show them as
+#' one or two trailing row-group sections:
+#' * **Outcome-specific additional parameters** -- parameters mapped to an
+#'   outcome (`constraints = c(a1 = "Y1", ...)`) sit under that outcome's
+#'   columns.
+#' * **Other additional parameters** -- unmapped parameters borrow the first
+#'   outcome's value columns (so they read in the same position as that
+#'   outcome's estimates), while the separate row group makes clear they are not
+#'   tied to it.
+#'
+#' Additional parameters are distinguished by their row group, not by a column
+#' spanner, and are formatted (and starred) exactly like the regression rows.
+#' See the `constraints` argument.
+#'
 #' @param model Mplus model object from MplusAutomation.
 #' @param label_replace Named character vector for replacing DV/IV labels.
 #' @param params Which parameter types to extract (passed to MplusAutomation).
@@ -870,6 +889,19 @@ mplus_growth_table <- function(coefs, factor_names, display, effective_bayes,
 #' @param model_type `"auto"` (default), `"growth"`, or `"default"`. `"auto"`
 #'   uses parsed `|` syntax to detect growth-factor models; `"growth"` forces
 #'   the growth-specific table layout.
+#' @param constraints Controls display of `MODEL CONSTRAINT NEW(...)` parameters
+#'   (e.g. RSA surface parameters a1--a5). `FALSE` (default) omits them, as
+#'   before. `TRUE` shows every NEW parameter in an **Other additional
+#'   parameters** row group that borrows the first outcome's value columns. A
+#'   *named character vector* (`c(a1 = "Y1", a2 = "Y1", ...)`) maps parameters to
+#'   an outcome so they sit under that outcome's columns in an **Outcome-specific
+#'   additional parameters** row group; names are matched case-insensitively
+#'   against the raw Mplus parameter name and the values must match a displayed
+#'   outcome label (after `label_replace`). Mapped and unmapped parameters can be
+#'   mixed: any unmapped (or unnamed) parameter falls into the **Other additional
+#'   parameters** group. Significance is starred with the same CrI-excludes-zero
+#'   / p-value rule as the regression rows. Not supported for growth-model tables
+#'   (a warning is issued).
 #' @param return_data `FALSE` (default) returns formatted `gt` tables when
 #'   **gt** is installed. `TRUE` returns the underlying wide tibble(s), useful
 #'   for data manipulation. Use `na_replace = NULL` with `return_data = TRUE` to
@@ -890,6 +922,10 @@ mplus_growth_table <- function(coefs, factor_names, display, effective_bayes,
 #' coef_table_mplus(m, label_replace = c("F3" = "Mediator", "F4" = "Outcome"))
 #' # put F2 above F1 in the predictor column
 #' coef_table_mplus(m, predictor_order = c("F2", "F1"))
+#' # show MODEL CONSTRAINT NEW(...) parameters (e.g. RSA surface parameters)
+#' rsa <- MplusAutomation::readModels("rsa_constraints.out")
+#' coef_table_mplus(rsa, constraints = TRUE)                       # "Other" block
+#' coef_table_mplus(rsa, constraints = c(cs_1 = "Z1", cs_2 = "Z2"))# under outcomes
 #' # two-level model with a random slope: returns list(fixed = , random = )
 #' m2 <- MplusAutomation::readModels("inst/extdata/ex9.2c.out")
 #' tbls <- coef_table_mplus(m2)
@@ -901,6 +937,7 @@ coef_table_mplus <- function(model, label_replace = NULL, params = NULL,
                               sig_threshold = 0.05, digits = 3, na_replace = "-",
                               predictor_order = NULL,
                               model_type = c("auto", "growth", "default"),
+                              constraints = FALSE,
                               return_data = FALSE) {
 
   model_type <- match.arg(model_type)
@@ -921,6 +958,12 @@ coef_table_mplus <- function(model, label_replace = NULL, params = NULL,
     }
   }
 
+  # MODEL CONSTRAINT NEW(...) parameters are only fetched when constraints are
+  # requested; coef() needs "new" in `params` to return them.
+  if (!isFALSE(constraints) && !"new" %in% params) {
+    params <- c(params, "new")
+  }
+
   # Resolve effective_bayes (silent); conflict warnings handled in coef_wrapper.
   effective_bayes <- if (is.null(bayes)) detect_mplus_bayes(model) else bayes
 
@@ -935,11 +978,28 @@ coef_table_mplus <- function(model, label_replace = NULL, params = NULL,
   # The one-tailed p-value note is only relevant when p-values are actually
   # displayed (est_se). With est_ci significance comes from the credibility
   # interval, so the note would just be noise.
-  coefs <- coef_wrapper(model, label_replace = label_replace, params = params,
-                        type = type, bayes = bayes, addci = fetch_ci,
-                        pval_note = effective_display == "est_se") |>
+  coefs_all <- coef_wrapper(model, label_replace = label_replace, params = params,
+                            type = type, bayes = bayes, addci = fetch_ci,
+                            pval_note = effective_display == "est_se")
+
+  # MODEL CONSTRAINT NEW(...) parameters are bare names with no "<-"/"<->"
+  # operator in their label (and hence no DV/IV). Split them off before the
+  # DV-keyed table logic below, which would otherwise drop them silently.
+  is_constraint_row <- !str_detect(coefs_all$Label, "<-")
+  constraint_rows <- coefs_all[is_constraint_row, , drop = FALSE]
+  coefs <- coefs_all[!is_constraint_row, , drop = FALSE] |>
     filter(!is.na(DV)) |>
     mutate(DV = trimws(DV), IV = trimws(IV))
+
+  show_constraints <- !isFALSE(constraints) && nrow(constraint_rows) > 0
+  if (!isFALSE(constraints) && nrow(constraint_rows) == 0) {
+    warning("`constraints` was requested but the model has no ",
+            "MODEL CONSTRAINT NEW(...) parameters.")
+  }
+  if (growth_model && show_constraints) {
+    warning("`constraints` are not supported for growth-model tables; ignoring.")
+    show_constraints <- FALSE
+  }
 
   # Drop variances that do not belong to a random slope (e.g. outcome residual
   # variances): only the random-slope (residual) variance is tabulated.
@@ -1079,6 +1139,47 @@ coef_table_mplus <- function(model, label_replace = NULL, params = NULL,
 
   dvs <- unique(coefs$DV)
 
+  # Resolve placement of the MODEL CONSTRAINT (NEW) parameters. When
+  # `constraints` is a named vector (param = outcome), the named parameters sit
+  # under their outcome column (matched case-insensitively on the raw Mplus
+  # name; the outcome value must match a displayed outcome label) in an
+  # "Outcome-specific additional parameters" section. Unmapped parameters reuse
+  # the first outcome's value columns -- so they read in the same position as
+  # that outcome's estimates -- but a separate "Other additional parameters"
+  # section makes clear they are not tied to that outcome. Their display name
+  # follows any `label_replace`. The `generic_dv` sentinel column is used only
+  # when the table has no outcomes at all (nowhere to borrow columns from).
+  generic_dv <- ".additional"
+  if (show_constraints) {
+    # coef() prepends a leading space to single-level labels; trim it before
+    # matching the user-supplied names and building the display label.
+    cnames <- trimws(constraint_rows$Label)
+    mapped_dv <- rep(NA_character_, nrow(constraint_rows))
+    if (is.character(constraints)) {
+      hit <- match(toupper(cnames), toupper(names(constraints)))
+      mapped_dv <- unname(constraints[hit])
+      bad <- !is.na(mapped_dv) & !mapped_dv %in% dvs
+      if (any(bad)) {
+        warning("`constraints` maps parameter(s) to outcome(s) not in the table: ",
+                paste(unique(mapped_dv[bad]), collapse = ", "),
+                ". Showing them as unattached additional parameters.")
+        mapped_dv[bad] <- NA_character_
+      }
+    }
+    fallback_dv <- if (length(dvs) >= 1) dvs[1] else generic_dv
+    constraint_rows$.disp_name <- apply_label_replace(cnames, label_replace)
+    constraint_rows$.dv  <- dplyr::if_else(is.na(mapped_dv), fallback_dv, mapped_dv)
+    constraint_rows$.grp <- dplyr::if_else(
+      is.na(mapped_dv),
+      "Other additional parameters",
+      "Outcome-specific additional parameters"
+    )
+  }
+  # A synthetic, outcome-free column block is needed only when there are no real
+  # outcomes for unmapped parameters to borrow columns from.
+  has_generic <- show_constraints && length(dvs) == 0 &&
+    any(constraint_rows$.dv == generic_dv)
+
   if (effective_display == "est_ci") {
     long <- coefs |>
       mutate(
@@ -1088,6 +1189,20 @@ coef_table_mplus <- function(model, label_replace = NULL, params = NULL,
         ul_col  = fmt(UpperCI)
       ) |>
       select(group, IV, DV, est_col, ll_col, ul_col)
+
+    if (show_constraints) {
+      long <- dplyr::bind_rows(long, constraint_rows |>
+        mutate(
+          group   = .grp,
+          IV      = .disp_name,
+          DV      = .dv,
+          sig     = !(LowerCI <= 0 & UpperCI >= 0),
+          est_col = paste0(fmt(est), if_else(sig, "*", "")),
+          ll_col  = fmt(LowerCI),
+          ul_col  = fmt(UpperCI)
+        ) |>
+        select(group, IV, DV, est_col, ll_col, ul_col))
+    }
 
     value_cols <- c("est_col", "ll_col", "ul_col")
     sub_labels <- c("Est.", "LL", "UL")
@@ -1106,6 +1221,19 @@ coef_table_mplus <- function(model, label_replace = NULL, params = NULL,
       ) |>
       select(group, IV, DV, est_col, se_col)
 
+    if (show_constraints) {
+      long <- dplyr::bind_rows(long, constraint_rows |>
+        mutate(
+          group   = .grp,
+          IV      = .disp_name,
+          DV      = .dv,
+          sig     = !is.na(pval) & pval < sig_threshold,
+          est_col = paste0(fmt(est), if_else(sig, "*", "")),
+          se_col  = fmt(se)
+        ) |>
+        select(group, IV, DV, est_col, se_col))
+    }
+
     value_cols <- c("est_col", "se_col")
     sub_labels <- c("Est.", "SE")
     footnote   <- if (effective_bayes) {
@@ -1123,10 +1251,11 @@ coef_table_mplus <- function(model, label_replace = NULL, params = NULL,
       names_glue  = "{.value}__{DV}"
     )
 
-  # Reorder so each DV's sub-columns are grouped together.
+  # Reorder so each DV's sub-columns are grouped together. The synthetic
+  # generic block (only when the table has no real outcomes) trails them.
   ordered_cols <- c("group", "IV", unlist(lapply(dvs, function(dv) {
     paste0(value_cols, "__", dv)
-  })))
+  })), if (has_generic) paste0(value_cols, "__", generic_dv))
   wide <- wide |> select(all_of(ordered_cols))
 
   if (!is.null(na_replace)) {
@@ -1150,24 +1279,23 @@ coef_table_mplus <- function(model, label_replace = NULL, params = NULL,
     wide <- wide |> mutate(IV = factor(IV, levels = iv_levels))
   }
 
-  # The main table now carries only Within and Between sections; random-slope
-  # variances move to the Random effects table and cross-level interactions sit
-  # in Between.
-  section_order <- c("Within", "Between")
+  # The main table carries Within/Between sections for two-level models;
+  # random-slope variances move to the Random effects table and cross-level
+  # interactions sit in Between. The MODEL CONSTRAINT block, when shown, trails
+  # as an outcome-specific section and/or an "other" section.
+  section_order <- c("Within", "Between",
+                     "Outcome-specific additional parameters",
+                     "Other additional parameters")
+  use_groups <- twolevel || show_constraints
 
-  if (twolevel) {
-    # Order Within, Between. Within each section, follow predictor_order when
-    # given, otherwise preserve the original order.
-    section_levels <- intersect(section_order, unique(wide$group))
-    wide <- wide |> mutate(group = factor(group, levels = section_levels))
-    wide <- if (is.null(predictor_order)) {
-      wide |> dplyr::arrange(group)
-    } else {
-      wide |> dplyr::arrange(group, IV)
-    }
-    wide <- wide |>
-      mutate(group = as.character(group)) |>
-      dplyr::rename(level = group)
+  if (use_groups) {
+    # Ungrouped single-level coefficients (group NA) sort first; named sections
+    # follow in section_order. Within each section, follow predictor_order when
+    # given (encoded on IV as a factor), otherwise preserve the original order.
+    ord_key <- match(wide$group, section_order)
+    ord_key[is.na(wide$group)] <- 0L
+    idx <- if (is.null(predictor_order)) order(ord_key) else order(ord_key, wide$IV)
+    wide <- wide[idx, , drop = FALSE] |> dplyr::rename(level = group)
   } else if (!is.null(predictor_order)) {
     wide <- wide |> dplyr::arrange(IV) |> select(-all_of("group"))
   } else {
@@ -1183,6 +1311,13 @@ coef_table_mplus <- function(model, label_replace = NULL, params = NULL,
     return(wide)
   }
 
+  # Ungrouped single-level coefficients carry a NA section in the returned data;
+  # for gt, render them with no group heading (gt prints a literal "NA"
+  # otherwise) while the constraint block keeps its row-group heading.
+  if (use_groups) {
+    wide <- wide |> mutate(level = dplyr::if_else(is.na(level), "", level))
+  }
+
   # Build per-column label list for gt.
   col_labels_list <- list(IV = "Predictor")
   for (dv in dvs) {
@@ -1190,8 +1325,13 @@ coef_table_mplus <- function(model, label_replace = NULL, params = NULL,
       col_labels_list[[paste0(value_cols[i], "__", dv)]] <- sub_labels[i]
     }
   }
+  if (has_generic) {
+    for (i in seq_along(value_cols)) {
+      col_labels_list[[paste0(value_cols[i], "__", generic_dv)]] <- sub_labels[i]
+    }
+  }
 
-  if (twolevel) {
+  if (use_groups) {
     gt_tbl <- gt::gt(wide, groupname_col = "level")
   } else {
     gt_tbl <- gt::gt(wide)
@@ -1202,7 +1342,10 @@ coef_table_mplus <- function(model, label_replace = NULL, params = NULL,
     gt::tab_footnote(footnote = footnote) |>
     gt::opt_footnote_marks(marks = "letters")
 
-  # One spanner per outcome.
+  # One spanner per outcome. Additional (constraint) parameters are
+  # distinguished by their row group, not a column spanner: mapped ones sit
+  # under their outcome's spanner, unmapped ones borrow the first outcome's
+  # columns. The synthetic generic block (no outcomes at all) gets no spanner.
   for (dv in dvs) {
     gt_tbl <- gt_tbl |>
       gt::tab_spanner(label = dv, columns = paste0(value_cols, "__", dv))

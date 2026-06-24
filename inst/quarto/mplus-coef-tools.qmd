@@ -31,6 +31,9 @@ Both functions:
   random slopes as the *between-person means of within-person effects*. When a
   model has random slopes, `coef_table_mplus()` returns a *pair* of tables --
   the fixed-effects table plus a dedicated **Random effects** table.
+- optionally surface **`MODEL CONSTRAINT` (`NEW`) parameters** -- indirect
+  effects, response-surface (RSA) parameters, and the like -- either as a
+  trailing block or mapped under the outcome they belong to (Part 6).
 
 The examples use the classic Mplus User's Guide data files that ship with
 `franzpak` in `inst/extdata/`.
@@ -455,6 +458,109 @@ coef_table_mplus(
 )
 ```
 
+# Part 6: `MODEL CONSTRAINT` (`NEW`) parameters
+
+Parameters defined in `MODEL CONSTRAINT` with `NEW(...)` -- functions of the
+estimated coefficients, such as indirect effects or **response-surface analysis
+(RSA)** parameters -- have no dependent variable, so they do not fit the
+predictor x outcome grid and are **omitted by default**. The `constraints`
+argument brings them into the table.
+
+`rsa_constraints` is a single-level Bayesian RSA model. Two latent predictors
+`X` and `Y`, together with their squares and interaction (built as latent
+moderation terms with `XWITH`), predict two latent outcomes `Z1` and `Z2`:
+
+```default
+Z1 ON X (b1) Y (b2) XS (b3) XY (b4) YS (b5);
+Z2 ON X (bb1) Y (bb2) XS (bb3) XY (bb4) YS (bb5);
+
+MODEL CONSTRAINT:
+  NEW(cs_1 cc_1 is_1 ic_1 a5_1   ! RSA surface params for Z1
+      cs_2 cc_2 is_2 ic_2 a5_2); ! RSA surface params for Z2
+  cs_1 = b1 + b2;  cc_1 = b3 + b4 + b5;  ...   ! a1, a2, ... for Z1
+  cs_2 = bb1 + bb2; cc_2 = bb3 + bb4 + bb5; ... ! a1, a2, ... for Z2
+```
+
+```{r read-rsa}
+m_rsa <- readModels(mplus_file("rsa_constraints.out"), quiet = TRUE)
+```
+
+By default `coef_table_mplus()` drops the `NEW` parameters, showing only the
+`b`/`bb` regression rows. Set `constraints = TRUE` to include every `NEW`
+parameter. With no outcome mapping they form an **Other additional parameters**
+row group that borrows the first outcome's columns -- the row group makes clear
+they are *not* estimates of that outcome:
+
+```{r ct-rsa-true}
+coef_table_mplus(m_rsa, constraints = TRUE)
+```
+
+## Mapping parameters to outcomes
+
+In an RSA the surface parameters belong to a *specific* outcome. Pass a **named
+vector** (`parameter = outcome`) to place each one under the right outcome's
+columns. The names are matched case-insensitively against the raw Mplus
+parameter name, and the values must match the *displayed* outcome labels (so they
+apply after any `label_replace`):
+
+```{r ct-rsa-map}
+coef_table_mplus(
+  m_rsa,
+  constraints = c(cs_1 = "Z1", cc_1 = "Z1", is_1 = "Z1", ic_1 = "Z1", a5_1 = "Z1",
+                  cs_2 = "Z2", cc_2 = "Z2", is_2 = "Z2", ic_2 = "Z2", a5_2 = "Z2")
+)
+```
+
+Now the `a`-parameters for `Z1` sit under the `Z1` columns and those for `Z2`
+under `Z2`, all in a single **Outcome-specific additional parameters** section.
+There is no extra "Additional parameters" column spanner: the parameters are
+distinguished by their row group, not by a column.
+
+Mapping can be **partial**. Any parameter you do not map (or name) falls back to
+the **Other additional parameters** group. Here only the `Z1` surface parameters
+are mapped; the `Z2` ones land in the Other group:
+
+```{r ct-rsa-partial}
+coef_table_mplus(
+  m_rsa,
+  constraints = c(cs_1 = "Z1", cc_1 = "Z1", is_1 = "Z1", ic_1 = "Z1", a5_1 = "Z1")
+)
+```
+
+## Friendlier labels
+
+`label_replace` renames both the outcomes and the parameter names. Remember to
+map to the *new* outcome labels when you rename them:
+
+```{r ct-rsa-labels}
+coef_table_mplus(
+  m_rsa,
+  label_replace = c("Z1" = "Outcome 1", "Z2" = "Outcome 2",
+                    "CS_1" = "a1 (LOC slope)",  "CC_1" = "a2 (LOC curv.)",
+                    "IS_1" = "a3 (LOIC slope)", "IC_1" = "a4 (LOIC curv.)",
+                    "A5_1" = "a5",
+                    "CS_2" = "a1 (LOC slope)",  "CC_2" = "a2 (LOC curv.)",
+                    "IS_2" = "a3 (LOIC slope)", "IC_2" = "a4 (LOIC curv.)",
+                    "A5_2" = "a5"),
+  constraints   = c("CS_1" = "Outcome 1", "CC_1" = "Outcome 1", "IS_1" = "Outcome 1",
+                    "IC_1" = "Outcome 1", "A5_1" = "Outcome 1",
+                    "CS_2" = "Outcome 2", "CC_2" = "Outcome 2", "IS_2" = "Outcome 2",
+                    "IC_2" = "Outcome 2", "A5_2" = "Outcome 2")
+)
+```
+
+Giving each outcome's parameters the *same* display name (`cs_1` and `cs_2` both
+become `a1 (LOC slope)`) is what produces the compact RSA layout above: rows are
+keyed by their displayed name within a section, so the two outcomes' `a1`
+estimates collapse onto a single `a1` row, sitting side by side under their
+respective outcome columns. That is exactly how a response-surface table is
+usually reported -- one row per surface parameter, one column block per outcome.
+
+Significance is starred with the same rule as the regression rows -- here, the
+95% credibility interval excluding zero (a Bayesian model). `constraints` works
+the same way in the `est_se` display, and is not supported for the growth-model
+layout of Part 4 (a warning is issued there).
+
 # Argument quick reference
 
 | Argument | `coef_wrapper()` | `coef_table_mplus()` |
@@ -468,6 +574,7 @@ coef_table_mplus(
 | `na_replace` | -- | fill empty cells; default `"-"`, set `NULL` for true `NA` |
 | `predictor_order` | -- | order predictor (row) labels |
 | `model_type` | -- | `"auto"`, `"growth"`, or `"default"` |
+| `constraints` | -- | show `MODEL CONSTRAINT` `NEW` params: `FALSE` (default), `TRUE`, or a named `parameter = outcome` mapping |
 | `return_data` | -- | return the underlying wide tibble(s) instead of `gt` |
 | `sig_threshold`, `digits` | -- | star threshold / rounding |
 

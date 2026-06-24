@@ -16,6 +16,7 @@ coef_table_mplus(
   na_replace = "-",
   predictor_order = NULL,
   model_type = c("auto", "growth", "default"),
+  constraints = FALSE,
   return_data = FALSE
 )
 }
@@ -56,6 +57,20 @@ for listed names that are not present in the table.}
 \item{model_type}{\code{"auto"} (default), \code{"growth"}, or \code{"default"}. \code{"auto"}
 uses parsed \code{|} syntax to detect growth-factor models; \code{"growth"} forces
 the growth-specific table layout.}
+
+\item{constraints}{Controls display of \verb{MODEL CONSTRAINT NEW(...)} parameters
+(e.g. RSA surface parameters a1--a5). \code{FALSE} (default) omits them, as
+before. \code{TRUE} shows every NEW parameter in an \strong{Other additional
+parameters} row group that borrows the first outcome's value columns. A
+\emph{named character vector} (\code{c(a1 = "Y1", a2 = "Y1", ...)}) maps parameters to
+an outcome so they sit under that outcome's columns in an \strong{Outcome-specific
+additional parameters} row group; names are matched case-insensitively
+against the raw Mplus parameter name and the values must match a displayed
+outcome label (after \code{label_replace}). Mapped and unmapped parameters can be
+mixed: any unmapped (or unnamed) parameter falls into the \strong{Other additional
+parameters} group. Significance is starred with the same CrI-excludes-zero
+/ p-value rule as the regression rows. Not supported for growth-model tables
+(a warning is issued).}
 
 \item{return_data}{\code{FALSE} (default) returns formatted \code{gt} tables when
 \strong{gt} is installed. \code{TRUE} returns the underlying wide tibble(s), useful
@@ -142,6 +157,28 @@ estimates a between-level mean for every latent component and variances are
 often declared in the Within part for latent decomposition; all of its rows
 are dropped so it cannot create a spurious column.
 }
+
+\subsection{MODEL CONSTRAINT (NEW) parameters}{
+
+Parameters declared with \code{NEW(...)} in \verb{MODEL CONSTRAINT} (e.g. the
+response-surface parameters a1--a5 of an RSA model) have no dependent
+variable, so they do not fit the predictor x outcome layout and are omitted by
+default. Set \code{constraints = TRUE} (or pass a named mapping) to show them as
+one or two trailing row-group sections:
+\itemize{
+\item \strong{Outcome-specific additional parameters} -- parameters mapped to an
+outcome (\code{constraints = c(a1 = "Y1", ...)}) sit under that outcome's
+columns.
+\item \strong{Other additional parameters} -- unmapped parameters borrow the first
+outcome's value columns (so they read in the same position as that
+outcome's estimates), while the separate row group makes clear they are not
+tied to it.
+}
+
+Additional parameters are distinguished by their row group, not by a column
+spanner, and are formatted (and starred) exactly like the regression rows.
+See the \code{constraints} argument.
+}
 }
 \examples{
 \dontrun{
@@ -152,6 +189,10 @@ coef_table_mplus(m, na_replace = NULL, return_data = TRUE)
 coef_table_mplus(m, label_replace = c("F3" = "Mediator", "F4" = "Outcome"))
 # put F2 above F1 in the predictor column
 coef_table_mplus(m, predictor_order = c("F2", "F1"))
+# show MODEL CONSTRAINT NEW(...) parameters (e.g. RSA surface parameters)
+rsa <- MplusAutomation::readModels("rsa_constraints.out")
+coef_table_mplus(rsa, constraints = TRUE)                       # "Other" block
+coef_table_mplus(rsa, constraints = c(cs_1 = "Z1", cs_2 = "Z2"))# under outcomes
 # two-level model with a random slope: returns list(fixed = , random = )
 m2 <- MplusAutomation::readModels("inst/extdata/ex9.2c.out")
 tbls <- coef_table_mplus(m2)

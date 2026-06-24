@@ -28,6 +28,19 @@
 * `bgjm_unresolved()` — non-blocking analogue of `mirai::unresolved()` (`TRUE`
   while running, `FALSE` once resolved).
 
+## Mplus coefficient tools
+
+* `coef_table_mplus()` can now display `MODEL CONSTRAINT` `NEW(...)` parameters
+  (indirect effects, response-surface (RSA) parameters, and the like), via the
+  new `constraints` argument — omitted by default. `constraints = TRUE` shows
+  them in a trailing **Other additional parameters** row group; a named
+  `c(parameter = outcome)` mapping places them under a specific outcome's columns
+  in an **Outcome-specific additional parameters** group (mapped and unmapped can
+  be mixed). Significance follows the same credibility-interval / p-value rule as
+  the regression rows, and `label_replace` renames the parameter names. A new
+  vignette section ("Part 6") and a bundled example (`rsa_constraints.out`)
+  demonstrate it.
+
 ## Parallelism and CPU budgeting
 
 * New vignette section covering the two layers of parallelism that combine on

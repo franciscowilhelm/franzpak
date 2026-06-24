@@ -876,3 +876,171 @@ test_that("coef_wrapper(addci=TRUE) leaves no NA intervals for Bayesian models",
     expect_false(any(is.na(cw$UpperCI)), info = f)
   }
 })
+
+# --- coef_table_mplus: MODEL CONSTRAINT NEW(...) parameters ---
+#
+# rsa_constraints.out is a single-level Bayesian RSA with two latent outcomes
+# (Z1, Z2); its NEW parameters split by outcome (cs_1..a5_1 -> Z1,
+# cs_2..a5_2 -> Z2).
+
+test_that("constraints = FALSE (default) drops NEW parameters even when requested", {
+  skip_if_not_installed("MplusAutomation")
+
+  m <- MplusAutomation::readModels(find_extdata("rsa_constraints.out"), quiet = TRUE)
+  d <- table_data(coef_table_mplus(m, params = c("regression", "new")))
+
+  # Only the b/bb regression rows survive; no constraint rows, no level column.
+  expect_setequal(d$IV, c("X", "Y", "XS", "XY", "YS"))
+  expect_false("level" %in% names(d))
+  expect_false(any(grepl("\\.additional", names(d))))
+  expect_false("CS_1" %in% d$IV)
+})
+
+test_that("constraints = TRUE puts unmapped NEW params in the Other group, reusing outcome columns", {
+  skip_if_not_installed("MplusAutomation")
+
+  m <- MplusAutomation::readModels(find_extdata("rsa_constraints.out"), quiet = TRUE)
+  d <- table_data(coef_table_mplus(m, constraints = TRUE,
+                                   return_data = TRUE, na_replace = NULL))
+
+  # No outcome mapping -> all NEW params live in the "Other additional
+  # parameters" row group, borrowing the first outcome's (Z1) columns. No
+  # separate generic column block is created.
+  expect_true("level" %in% names(d))
+  expect_setequal(d$level[!is.na(d$level)],
+                  rep("Other additional parameters", 10))
+  expect_false(any(grepl("\\.additional", names(d))))
+
+  reg <- d[is.na(d$level), ]
+  con <- d[!is.na(d$level), ]
+  expect_setequal(reg$IV, c("X", "Y", "XS", "XY", "YS"))
+
+  # Values and the CrI-excludes-zero star rule carry over to constraint rows.
+  expect_true(grepl("0\\.203\\*", con$est_col__Z1[con$IV == "CS_1"]))
+  expect_equal(as.numeric(con$ll_col__Z1[con$IV == "CS_1"]), 0.122,
+               tolerance = 1e-3)
+  expect_false(grepl("\\*", con$est_col__Z1[con$IV == "A5_1"]))  # CrI spans 0
+})
+
+test_that("constraints honour label_replace on the parameter name", {
+  skip_if_not_installed("MplusAutomation")
+
+  m <- MplusAutomation::readModels(find_extdata("rsa_constraints.out"), quiet = TRUE)
+  d <- table_data(coef_table_mplus(
+    m, constraints = TRUE, label_replace = c("CS_1" = "a1 (LOC slope)"),
+    return_data = TRUE, na_replace = NULL))
+
+  expect_true("a1 (LOC slope)" %in% d$IV)
+  expect_false("CS_1" %in% d$IV)
+})
+
+test_that("constraints warns on a mapping to an unknown outcome and falls back", {
+  skip_if_not_installed("MplusAutomation")
+
+  m <- MplusAutomation::readModels(find_extdata("rsa_constraints.out"), quiet = TRUE)
+  expect_warning(
+    tbl <- coef_table_mplus(m, constraints = c(cs_1 = "NOPE"),
+                            return_data = TRUE, na_replace = NULL),
+    "not in the table"
+  )
+  d <- table_data(tbl)
+  # Unknown-outcome param is shown as unattached (Other group), not under NOPE.
+  expect_false(any(grepl("__NOPE$", names(d))))
+  expect_equal(d$level[d$IV == "CS_1"], "Other additional parameters")
+  expect_true(grepl("0\\.203\\*", d$est_col__Z1[d$IV == "CS_1"]))
+})
+
+test_that("constraints warns when the model has no NEW parameters", {
+  skip_if_not_installed("MplusAutomation")
+
+  m <- MplusAutomation::readModels(find_extdata("ex5.11.out"), quiet = TRUE)
+  expect_warning(coef_table_mplus(m, constraints = TRUE),
+                 "no MODEL CONSTRAINT")
+})
+
+test_that("constraints gt output uses a row group and no extra column spanner", {
+  skip_if_not_installed("MplusAutomation")
+  skip_if_not_installed("gt")
+
+  m   <- MplusAutomation::readModels(find_extdata("rsa_constraints.out"), quiet = TRUE)
+  tbl <- coef_table_mplus(m, constraints = TRUE)
+
+  expect_s3_class(tbl, "gt_tbl")
+  expect_true("Other additional parameters" %in% tbl[["_row_groups"]])
+  # Only the outcome column spanners (Z1, Z2); no additional-params spanner.
+  expect_setequal(unlist(tbl[["_spanners"]]$spanner_label), c("Z1", "Z2"))
+  html <- as.character(gt::as_raw_html(tbl))
+  expect_true(grepl("Other additional parameters", html))
+  expect_true(grepl("CS_1", html))
+})
+
+test_that("constraints work in est_se mode (stars from p-values)", {
+  skip_if_not_installed("MplusAutomation")
+
+  m <- MplusAutomation::readModels(find_extdata("rsa_constraints.out"), quiet = TRUE)
+  d <- suppressMessages(table_data(coef_table_mplus(
+    m, constraints = TRUE, display_type = "est_se",
+    return_data = TRUE, na_replace = NULL)))
+
+  expect_true(all(c("est_col__Z1", "se_col__Z1") %in% names(d)))
+  expect_false(any(grepl("^ll_col|^ul_col", names(d))))
+  expect_false(any(grepl("\\.additional", names(d))))
+  con <- d[!is.na(d$level), ]
+  expect_equal(as.numeric(con$se_col__Z1[con$IV == "CS_1"]), 0.039,
+               tolerance = 1e-3)
+})
+
+# --- coef_table_mplus: multi-outcome MODEL CONSTRAINT mapping ---
+
+test_that("constraints map each outcome's NEW params under its own columns", {
+  skip_if_not_installed("MplusAutomation")
+
+  m  <- MplusAutomation::readModels(find_extdata("rsa_constraints.out"), quiet = TRUE)
+  mp <- c(cs_1 = "Z1", cc_1 = "Z1", is_1 = "Z1", ic_1 = "Z1", a5_1 = "Z1",
+          cs_2 = "Z2", cc_2 = "Z2", is_2 = "Z2", ic_2 = "Z2", a5_2 = "Z2")
+  d  <- table_data(coef_table_mplus(m, constraints = mp,
+                                    return_data = TRUE, na_replace = NULL))
+
+  # Two outcome column blocks; all constraints in one Outcome-specific section.
+  expect_true(all(c("est_col__Z1", "est_col__Z2") %in% names(d)))
+  expect_setequal(d$level[!is.na(d$level)],
+                  rep("Outcome-specific additional parameters", 10))
+
+  # _1 params land in the Z1 columns (Z2 empty); _2 params in Z2 (Z1 empty).
+  expect_true(grepl("0\\.203\\*", d$est_col__Z1[d$IV == "CS_1"]))
+  expect_true(is.na(d$est_col__Z2[d$IV == "CS_1"]))
+  expect_true(grepl("-0\\.204\\*", d$est_col__Z2[d$IV == "CS_2"]))
+  expect_true(is.na(d$est_col__Z1[d$IV == "CS_2"]))
+})
+
+test_that("multi-outcome partial mapping splits Outcome-specific vs Other", {
+  skip_if_not_installed("MplusAutomation")
+
+  # Map only the outcome-1 params to Z1; leave the outcome-2 ones unmapped --
+  # they fall into the Other group, borrowing the first outcome (Z1).
+  m  <- MplusAutomation::readModels(find_extdata("rsa_constraints.out"), quiet = TRUE)
+  mp <- c(cs_1 = "Z1", cc_1 = "Z1", is_1 = "Z1", ic_1 = "Z1", a5_1 = "Z1")
+  d  <- table_data(coef_table_mplus(m, constraints = mp,
+                                    return_data = TRUE, na_replace = NULL))
+
+  expect_false(any(grepl("\\.additional", names(d))))
+  expect_equal(d$level[d$IV == "CS_1"], "Outcome-specific additional parameters")
+  expect_equal(d$level[d$IV == "CS_2"], "Other additional parameters")
+  # Mapped _1 under Z1; unmapped _2 borrows the first outcome's (Z1) columns.
+  expect_true(grepl("0\\.203\\*", d$est_col__Z1[d$IV == "CS_1"]))
+  expect_true(grepl("-0\\.204\\*", d$est_col__Z1[d$IV == "CS_2"]))
+})
+
+test_that("multi-outcome mapped gt has two outcome spanners and one row group", {
+  skip_if_not_installed("MplusAutomation")
+  skip_if_not_installed("gt")
+
+  m  <- MplusAutomation::readModels(find_extdata("rsa_constraints.out"), quiet = TRUE)
+  mp <- c(cs_1 = "Z1", cc_1 = "Z1", is_1 = "Z1", ic_1 = "Z1", a5_1 = "Z1",
+          cs_2 = "Z2", cc_2 = "Z2", is_2 = "Z2", ic_2 = "Z2", a5_2 = "Z2")
+  tbl <- coef_table_mplus(m, constraints = mp)
+
+  expect_setequal(unlist(tbl[["_spanners"]]$spanner_label), c("Z1", "Z2"))
+  expect_true("Outcome-specific additional parameters" %in% tbl[["_row_groups"]])
+  expect_false("Other additional parameters" %in% tbl[["_row_groups"]])
+})
