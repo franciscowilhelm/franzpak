@@ -196,6 +196,7 @@ test_that("bgjm_start_blavaan returns a fitted blavaan object", {
   skip_if_not_installed("blavaan")
   skip_if_not_installed("lavaan")
   skip_on_cran()
+  skip_on_ci()  # heavy Stan compile/sampling; run locally only
   output_base <- file.path(tempdir(), sprintf("bgjm-blavaan-%d", Sys.getpid()))
 
   # Classic Bollen (1989) political democracy model
@@ -231,6 +232,7 @@ test_that("bgjm_start_blavaan runs parallel MCMC chains inside a job", {
   skip_if_not_installed("lavaan")
   skip_if_not_installed("rstan")
   skip_on_cran()
+  skip_on_ci()  # heavy Stan compile/sampling + fork-from-daemon; run locally only
   output_base <- file.path(tempdir(), sprintf("bgjm-blavaan-par-%d", Sys.getpid()))
 
   # Parallel chains use parallel::mclapply (fork) on Unix; this guards that

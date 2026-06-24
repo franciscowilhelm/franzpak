@@ -1,0 +1,52 @@
+# Build the package source tarball when a GitHub Release is published and
+# attach it as a release asset. Cut a release locally with
+# usethis::use_github_release() (creates a draft from NEWS.md + DESCRIPTION),
+# then publish it on GitHub to trigger this workflow.
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+name: release.yaml
+
+permissions:
+  contents: write
+
+jobs:
+  build-release:
+    runs-on: ubuntu-latest
+
+    env:
+      GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: r-lib/actions/setup-pandoc@v2
+
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          use-public-rspm: true
+
+      - uses: r-lib/actions/setup-r-dependencies@v2
+        with:
+          # papaja is GitHub-only (not on CRAN).
+          extra-packages: |
+            crsh/papaja
+            any::pkgbuild
+          needs: check
+
+      - name: Build source tarball
+        run: |
+          tarball <- pkgbuild::build(".", dest_path = ".", vignettes = FALSE)
+          # Expose the built filename to later steps.
+          cat(sprintf("tarball=%s\n", basename(tarball)),
+              file = Sys.getenv("GITHUB_OUTPUT"), append = TRUE)
+        shell: Rscript {0}
+        id: build
+
+      - name: Upload tarball to the GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload "${{ github.event.release.tag_name }}" "${{ steps.build.outputs.tarball }}" --clobber
+        if: github.event_name == 'release'
