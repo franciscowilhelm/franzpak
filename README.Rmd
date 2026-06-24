@@ -70,7 +70,14 @@ registry and per-job file/artifact capture on top:
 You can install the development version of franzpak like so:
 
 ``` r
-devtools::install_github("franciscowilhelm/franzpak")
+# install.packages("pak")
+pak::pak("franciscowilhelm/franzpak")
+```
+
+Or pin to a tagged release:
+
+``` r
+pak::pak("franciscowilhelm/franzpak@v0.4.0")
 ```
 
 Currently I do not plan to submit to CRAN.
