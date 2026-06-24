@@ -19,3 +19,4 @@
 ^vignettes/README\.md$
 ^vignettes/background-jobs\.html$
 ^vignettes/background-jobs_files$
+^\.github$
