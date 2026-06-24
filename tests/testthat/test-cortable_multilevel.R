@@ -214,7 +214,11 @@ test_that("User-specified between variables suppress auto-detect message", {
     dplyr::mutate(WL2 = rnorm(1)) |>
     dplyr::ungroup()
 
-  expect_silent(
+  # Assert specifically that the auto-detect *message* is suppressed when
+  # `between` is user-specified. (Not expect_silent(): psych::statsBy() emits
+  # benign numeric warnings for WL2, a pure level-2 variable with zero
+  # within-cluster SD, and those vary by psych/R version.)
+  expect_no_message(
     result <- cortable_multilevel(mc_twolevel_l2var,
                                   c("Y", "M", "X", "WL2"),
                                   "CLUSTER",

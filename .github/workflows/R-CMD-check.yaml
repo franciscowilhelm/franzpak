@@ -1,0 +1,61 @@
+# Workflow derived from https://github.com/r-lib/actions/tree/v2/examples
+# Sanity CI: run R CMD check on push/PR. Not CRAN-targeted, so a few
+# package-specific accommodations are made (see comments below).
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+name: R-CMD-check.yaml
+
+permissions: read-all
+
+jobs:
+  R-CMD-check:
+    runs-on: ${{ matrix.config.os }}
+
+    name: ${{ matrix.config.os }} (${{ matrix.config.r }})
+
+    strategy:
+      fail-fast: false
+      matrix:
+        config:
+          - {os: ubuntu-latest, r: 'release'}
+          - {os: ubuntu-latest, r: 'oldrel-1'}
+
+    env:
+      GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
+      R_KEEP_PKG_SOURCE: yes
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: r-lib/actions/setup-pandoc@v2
+
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          r-version: ${{ matrix.config.r }}
+          http-user-agent: ${{ matrix.config.http-user-agent }}
+          use-public-rspm: true
+
+      - uses: r-lib/actions/setup-r-dependencies@v2
+        with:
+          # papaja is GitHub-only (not on CRAN); install it explicitly.
+          # MplusAutomation installs from CRAN but the Mplus binary is not
+          # available on the runner, so MplusAutomation-backed tests must
+          # skip_on_ci().
+          extra-packages: |
+            crsh/papaja
+            any::rcmdcheck
+          needs: check
+
+      - uses: r-lib/actions/check-r-package@v2
+        with:
+          # Vignettes are shipped pre-rendered (no .qmd/.Rmd source in
+          # vignettes/), so do not attempt to rebuild them on CI.
+          args: 'c("--no-manual", "--no-build-vignettes", "--no-vignettes", "--as-cran")'
+          build_args: 'c("--no-build-vignettes")'
+          # Known NOTEs exist (non-CRAN package); fail only on errors/warnings.
+          error-on: '"warning"'
+          upload-snapshots: true
