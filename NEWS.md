@@ -1,4 +1,4 @@
-# franzpak 0.4.0.9000
+# franzpak 0.4.1
 
 * `RSA_mplus()` is deprecated in franzpak and now forwards to the canonical
   implementation in the `rsahelpers` package.
