@@ -1,6 +1,6 @@
 Package: franzpak
 Title: Miscellaneous functions for social science data analysis
-Version: 0.4.0
+Version: 0.4.0.9000
 Authors@R: 
     person("Francisco", "Wilhelm", , "francisco.wilhelm@unibe.ch", role = c("aut", "cre"),
            comment = c(ORCID = "0000-0002-1717-7975"))
@@ -10,7 +10,7 @@ Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
 Suggests:
     MplusAutomation,
-    RSA,
+    rsahelpers,
     testthat (>= 3.0.0),
     withr,
     lavaan,
@@ -21,6 +21,8 @@ Suggests:
     rmarkdown,
     gt
 Config/testthat/edition: 3
+Remotes:
+    franciscowilhelm/rsahelpers
 VignetteBuilder: knitr
 Imports:
     dplyr,

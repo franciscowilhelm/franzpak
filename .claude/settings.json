@@ -3,5 +3,9 @@
     "allow": [
       "Bash(zotgrep *)"
     ]
+  },
+  "skillOverrides": {
+    "r-package-development": "on",
+    "testing-r-packages": "on"
   }
 }
