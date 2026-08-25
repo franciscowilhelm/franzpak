@@ -96,7 +96,7 @@ pak::pak("franciscowilhelm/franzpak")
 Or pin to a tagged release:
 
 ``` r
-pak::pak("franciscowilhelm/franzpak@v0.4.0")
+pak::pak("franciscowilhelm/franzpak@v0.4.1")
 ```
 
 Currently I do not plan to submit to CRAN.
