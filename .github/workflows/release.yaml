@@ -33,6 +33,7 @@ jobs:
           # papaja is GitHub-only (not on CRAN).
           extra-packages: |
             crsh/papaja
+            franciscowilhelm/rsahelpers
             any::pkgbuild
           needs: check
 

@@ -1,3 +1,8 @@
+# franzpak 0.4.0.9000
+
+* `RSA_mplus()` is deprecated in franzpak and now forwards to the canonical
+  implementation in the `rsahelpers` package.
+
 # franzpak 0.4.0
 
 ## Background jobs (`bgjm_*`): new mirai engine

@@ -2,7 +2,7 @@
 % Please edit documentation in R/RSA_mplus.R
 \name{RSA_mplus}
 \alias{RSA_mplus}
-\title{Plot RSA surfaces from Mplus output}
+\title{Deprecated Mplus RSA helper}
 \usage{
 RSA_mplus(
   model,
@@ -39,58 +39,39 @@ RSA_mplus(
 
 \item{pred_y2}{Label of the squared Y term in the Mplus output.}
 
-\item{b0}{Optional intercept passed to \code{\link[RSA:plotRSA]{RSA::plotRSA()}}. If \code{NULL}, the
-function looks for \verb{<outcome><-Intercepts>} in the Mplus expectation
-parameters and otherwise falls back to \code{0}.}
+\item{b0}{Optional intercept forwarded to \code{\link[rsahelpers:RSA_mplus]{rsahelpers::RSA_mplus()}}.}
 
-\item{coef_type}{Which Mplus coefficient table to use. Passed to
-\code{\link[stats:coef]{stats::coef()}} for \code{mplus.model} objects.}
+\item{coef_type}{Which Mplus coefficient table to use.}
 
 \item{new_labels}{Optional character vector of \code{NEW} parameter labels to
-return. Matching is case-insensitive.}
+return.}
 
 \item{include_new}{If \code{TRUE}, include \code{NEW} parameters from \verb{MODEL CONSTRAINT} in the returned object.}
 
-\item{plot}{If \code{TRUE}, call \code{\link[RSA:plotRSA]{RSA::plotRSA()}}. If \code{FALSE}, only return the
-extracted coefficients and metadata.}
+\item{plot}{If \code{TRUE}, plot the extracted polynomial response surface.}
 
-\item{xlab}{Optional x-axis label passed to \code{\link[RSA:plotRSA]{RSA::plotRSA()}}. Defaults to
-\code{pred_x}.}
+\item{xlab, ylab, zlab}{Optional axis labels passed to the plotting method.}
 
-\item{ylab}{Optional y-axis label passed to \code{\link[RSA:plotRSA]{RSA::plotRSA()}}. Defaults to
-\code{pred_y}.}
-
-\item{zlab}{Optional z-axis label passed to \code{\link[RSA:plotRSA]{RSA::plotRSA()}}. Defaults to
-\code{outcome}.}
-
-\item{...}{Additional arguments passed to \code{\link[RSA:plotRSA]{RSA::plotRSA()}}.}
+\item{...}{Additional arguments passed to \code{\link[rsahelpers:RSA_mplus]{rsahelpers::RSA_mplus()}}.}
 }
 \value{
-A list with the extracted RSA coefficients, selected Mplus
-parameters, optional \code{NEW} parameters, and the plot object when
-\code{plot = TRUE}.
+The value returned by \code{\link[rsahelpers:RSA_mplus]{rsahelpers::RSA_mplus()}}.
 }
 \description{
-Plot RSA surfaces from Mplus output
-}
-\details{
-\code{RSA::plotRSA()} accepts the polynomial coefficients directly
-(\code{x}, \code{y}, \code{x2}, \code{xy}, \code{y2}, and optionally \code{b0}). \code{NEW} parameters from
-\verb{MODEL CONSTRAINT} are returned for inspection, but are not passed to
-\code{plotRSA()} because that function computes surface parameters internally
-from the polynomial coefficients.
+\code{RSA_mplus()} has moved to the \code{rsahelpers} package. This compatibility
+wrapper warns about the move and forwards all arguments to
+\code{\link[rsahelpers:RSA_mplus]{rsahelpers::RSA_mplus()}}.
 }
 \examples{
 \dontrun{
-rsa_pos <- RSA_mplus(
-  system.file("extdata", "congruence_sim.out", package = "franzpak"),
+RSA_mplus(
+  "model.out",
   outcome = "Z",
   pred_x = "X",
   pred_y = "Y",
   pred_x2 = "XS",
   pred_xy = "XY",
-  pred_y2 = "YS",
-  plot = TRUE
+  pred_y2 = "YS"
 )
 }
 }

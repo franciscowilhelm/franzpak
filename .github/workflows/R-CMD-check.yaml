@@ -47,6 +47,7 @@ jobs:
           # skip_on_ci().
           extra-packages: |
             crsh/papaja
+            franciscowilhelm/rsahelpers
             any::rcmdcheck
           needs: check
 

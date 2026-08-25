@@ -1,69 +1,60 @@
-find_rsa_mplus_example <- function() {
-  installed_path <- system.file("extdata", "congruence_sim.out", package = "franzpak")
-  if (nzchar(installed_path)) {
-    return(installed_path)
-  }
-
-  normalizePath(file.path("inst", "extdata", "congruence_sim.out"), mustWork = TRUE)
+find_rsahelpers_mplus_example <- function() {
+  system.file(
+    "extdata",
+    "congruence_sim.out",
+    package = "rsahelpers",
+    mustWork = TRUE
+  )
 }
 
-test_that("RSA_mplus extracts unstandardized coefficients from Mplus output", {
+test_that("RSA_mplus warns and forwards to rsahelpers", {
   skip_if_not_installed("MplusAutomation")
+  skip_if_not_installed("rsahelpers")
 
-  model_path <- find_rsa_mplus_example()
-
-  expect_warning(
-    result <- RSA_mplus(
-      model = model_path,
-      outcome = "Z",
-      pred_x = "X",
-      pred_y = "Y",
-      pred_x2 = "XS",
-      pred_xy = "XY",
-      pred_y2 = "YS",
-      new_labels = c("CS", "CC", "IS", "IC", "A5"),
-      plot = FALSE
-    ),
-    "using `b0 = 0`"
+  args <- list(
+    model = find_rsahelpers_mplus_example(),
+    outcome = "Z",
+    pred_x = "X",
+    pred_y = "Y",
+    pred_x2 = "XS",
+    pred_xy = "XY",
+    pred_y2 = "YS",
+    b0 = 0,
+    include_new = FALSE,
+    plot = FALSE
   )
 
-  expect_s3_class(result, "rsa_mplus")
-  expect_equal(
-    unname(result$coefficients[c("x", "y", "x2", "xy", "y2", "b0")]),
-    c(0.326, 0.166, -0.058, 0.069, -0.085, 0),
-    tolerance = 1e-8
+  expect_snapshot(
+    old_result <- do.call(RSA_mplus, args)
   )
-  expect_equal(result$regression_parameters$term, c("x", "y", "x2", "xy", "y2"))
-  expect_equal(result$new_parameters$Label, c("CS", "CC", "IS", "IC", "A5"))
-  expect_null(result$plot)
+  new_result <- do.call(rsahelpers::RSA_mplus, args)
+
+  expect_s3_class(old_result, "rsa_mplus")
+  expect_equal(old_result$coefficients, new_result$coefficients)
+  expect_equal(old_result$regression_parameters, new_result$regression_parameters)
+  expect_equal(old_result$new_parameters, new_result$new_parameters)
+  expect_equal(old_result$outcome, new_result$outcome)
+  expect_equal(old_result$coefficient_type, new_result$coefficient_type)
 })
 
-test_that("RSA_mplus accepts an mplus.model object and standardized coefficients", {
-  skip_if_not_installed("MplusAutomation")
+test_that("RSA_mplus explains how to install a missing rsahelpers", {
+  local_mocked_bindings(
+    .rsahelpers_available = function() FALSE,
+    .package = "franzpak"
+  )
 
-  model_path <- find_rsa_mplus_example()
-  mplus_model <- MplusAutomation::readModels(model_path, quiet = TRUE)
-
-  expect_warning(
-    result <- RSA_mplus(
-      model = mplus_model,
+  expect_snapshot(
+    RSA_mplus(
+      model = "model.out",
       outcome = "Z",
       pred_x = "X",
       pred_y = "Y",
       pred_x2 = "XS",
       pred_xy = "XY",
       pred_y2 = "YS",
-      coef_type = "stdyx",
-      include_new = FALSE,
+      b0 = 0,
       plot = FALSE
     ),
-    "using `b0 = 0`"
+    error = TRUE
   )
-
-  expect_equal(
-    unname(result$coefficients[c("x", "y", "x2", "xy", "y2")]),
-    c(0.432, 0.200, -0.080, 0.086, -0.097),
-    tolerance = 1e-8
-  )
-  expect_null(result$new_parameters)
 })

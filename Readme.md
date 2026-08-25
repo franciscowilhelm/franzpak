@@ -46,6 +46,11 @@ Therefore, users may find useful functions here for similar purposes.
   (via MplusAutomation). Splits labels into DV/IV columns, supports
   Bayesian models, and can add confidence intervals.
 
+Response-surface helpers now live in the
+[`rsahelpers`](https://github.com/franciscowilhelm/rsahelpers) package.
+The deprecated `franzpak::RSA_mplus()` remains as a compatibility
+wrapper.
+
 ### Background Job Management
 
 Functions for running long model fits (lavaan, tidyLPA, Mplus) in
