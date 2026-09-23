@@ -325,6 +325,80 @@ test_that("coef_table_mplus est_ci footnote defines LL and UL", {
   expect_true(grepl("confidence interval", htmlf))
 })
 
+# --- coef_table_mplus: est_se_ci (estimate, SE/PSD, LL, UL) ---
+
+test_that("coef_table_mplus est_se_ci shows Est., SE, LL and UL with interval stars", {
+  skip_if_not_installed("MplusAutomation")
+
+  m <- MplusAutomation::readModels(find_extdata("ex5.11_BAYES.out"), quiet = TRUE)
+  d <- expect_no_message(table_data(coef_table_mplus(m, display_type = "est_se_ci")))
+
+  expect_equal(
+    grep("__F4$", names(d), value = TRUE),
+    c("est_col__F4", "se_col__F4", "ll_col__F4", "ul_col__F4")
+  )
+  f3 <- d[d$IV == "F3", ]
+  expect_true(grepl("0\\.466\\*", f3$est_col__F4))
+  expect_equal(as.numeric(f3$se_col__F4), 0.059, tolerance = 1e-3)
+  expect_equal(as.numeric(f3$ll_col__F4), 0.353, tolerance = 1e-3)
+  expect_equal(as.numeric(f3$ul_col__F4), 0.582, tolerance = 1e-3)
+})
+
+test_that("coef_table_mplus est_se_ci labels the SE column PSD for Bayes and defines it", {
+  skip_if_not_installed("MplusAutomation")
+  skip_if_not_installed("gt")
+
+  mb   <- MplusAutomation::readModels(find_extdata("ex5.11_BAYES.out"), quiet = TRUE)
+  html <- as.character(gt::as_raw_html(coef_table_mplus(mb, display_type = "est_se_ci")))
+  expect_true(grepl(">PSD<", html))
+  expect_true(grepl("PSD = posterior standard deviation", html))
+  expect_true(grepl("LL and UL are the lower and upper limits", html))
+
+  # Frequentist: plain SE, confidence-interval wording, no PSD note.
+  mf    <- MplusAutomation::readModels(find_extdata("ex5.11.out"), quiet = TRUE)
+  htmlf <- as.character(gt::as_raw_html(coef_table_mplus(mf, display_type = "est_se_ci")))
+  expect_true(grepl(">SE<", htmlf))
+  expect_false(grepl("PSD", htmlf))
+  expect_true(grepl("confidence interval", htmlf))
+})
+
+test_that("est_se_ci reaches the random-effects, growth and constraint rows", {
+  skip_if_not_installed("MplusAutomation")
+
+  m2 <- MplusAutomation::readModels(find_extdata("ex9.2c.out"), quiet = TRUE)
+  re <- table_data(coef_table_mplus(m2, display_type = "est_se_ci")$random)
+  expect_equal(names(re), c("Parameter", "est_col", "se_col", "ll_col", "ul_col"))
+
+  # The growth fixture has no interval output: fall back to est_se, as est_ci does.
+  mg <- MplusAutomation::readModels(find_extdata("ex6.12.out"), quiet = TRUE)
+  dg <- suppressWarnings(
+    coef_table_mplus(mg, display_type = "est_se_ci", return_data = TRUE)
+  )
+  expect_true("se_col__S" %in% names(dg))
+  expect_false(any(grepl("^ll_col", names(dg))))
+  expect_warning(
+    expect_warning(
+      coef_table_mplus(mg, display_type = "est_se_ci", return_data = TRUE),
+      "not available for this model"
+    ),
+    "Intervals unavailable"
+  )
+
+  mc <- MplusAutomation::readModels(find_extdata("rsa_constraints.out"), quiet = TRUE)
+  dc <- table_data(coef_table_mplus(mc, constraints = TRUE, display_type = "est_se_ci",
+                                    return_data = TRUE, na_replace = NULL))
+  other <- dc[!is.na(dc$level) & dc$level == "Other additional parameters", ]
+  se_col <- grep("^se_col__", names(dc), value = TRUE)[1]
+  expect_false(anyNA(other[[se_col]]))
+})
+
+test_that("coef_table_mplus rejects an unknown display_type", {
+  skip_if_not_installed("MplusAutomation")
+
+  m <- MplusAutomation::readModels(find_extdata("ex5.11.out"), quiet = TRUE)
+  expect_error(coef_table_mplus(m, display_type = "est_psd"), "should be one of")
+})
+
 # --- helpers: random-slope detection and two-level detection ---
 
 test_that("mplus_random_slopes parses the | declaration for ex9.2c", {
