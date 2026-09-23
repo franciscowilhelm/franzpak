@@ -1,3 +1,13 @@
+# franzpak (development version)
+
+* `coef_table_mplus()` gains `display_type = "est_se_ci"`: estimate, SE and the
+  95% interval limits (LL/UL) side by side, with stars from the interval as in
+  `"est_ci"`. For Bayesian models the SE column is labelled `PSD` (posterior
+  standard deviation) and defined in the footnote. It applies to the main,
+  growth, random-effects and `MODEL CONSTRAINT` rows, and falls back to
+  `"est_se"` when intervals are unavailable. Unknown `display_type` values now
+  raise an error. The three display types share one internal formatter.
+
 # franzpak 0.4.1
 
 * `RSA_mplus()` is deprecated in franzpak and now forwards to the canonical

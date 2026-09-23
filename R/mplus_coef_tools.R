@@ -530,6 +530,71 @@ coef_wrapper <- function(model, label_replace = NULL, params = c('regression'), 
   testcoefs
 }
 
+#' Format the value columns of a coefficient table (internal)
+#'
+#' Shared by the main, growth and random-effects tables so the three display
+#' types are formatted, starred and footnoted identically.
+#'
+#' @param df Rows from [coef_wrapper()] carrying `est` and `se`/`pval` and, for
+#'   the interval displays, `LowerCI`/`UpperCI`.
+#' @param display `"est_ci"`, `"est_se"`, or `"est_se_ci"`.
+#' @param effective_bayes Logical; controls credibility-vs-confidence wording
+#'   and the SE label (`PSD` for Bayesian models in `"est_se_ci"`).
+#' @param sig_threshold P-value threshold for stars (`"est_se"` only).
+#' @param digits Decimal places.
+#' @return A list with `data` (`df` plus the formatted `est_col`, `se_col`,
+#'   `ll_col`, `ul_col` as applicable), `value_cols`, `sub_labels` and
+#'   `footnote`.
+#' @noRd
+mplus_display_columns <- function(df, display, effective_bayes, sig_threshold,
+                                  digits) {
+  fmt <- function(x) format(round(x, digits), nsmall = digits)
+  interval <- if (effective_bayes) "credibility" else "confidence"
+
+  if (display == "est_se") {
+    df <- df |>
+      mutate(
+        .sig    = !is.na(pval) & pval < sig_threshold,
+        est_col = paste0(fmt(est), if_else(.sig, "*", "")),
+        se_col  = fmt(se)
+      )
+    footnote <- if (effective_bayes) {
+      paste0("* p < ", sig_threshold, ", one-tailed.")
+    } else {
+      paste0("* p < ", sig_threshold)
+    }
+    return(list(data = select(df, -".sig"), value_cols = c("est_col", "se_col"),
+                sub_labels = c("Est.", "SE"), footnote = footnote))
+  }
+
+  # est_ci and est_se_ci: stars come from the interval, not from p-values.
+  df <- df |>
+    mutate(
+      .sig    = !(LowerCI <= 0 & UpperCI >= 0),
+      est_col = paste0(fmt(est), if_else(.sig, "*", "")),
+      se_col  = fmt(se),
+      ll_col  = fmt(LowerCI),
+      ul_col  = fmt(UpperCI)
+    )
+  footnote <- paste0(
+    "* 95% ", interval, " interval excludes zero. ",
+    "LL and UL are the lower and upper limits of the 95% ", interval, " interval."
+  )
+
+  if (display == "est_ci") {
+    return(list(data = select(df, -".sig", -"se_col"),
+                value_cols = c("est_col", "ll_col", "ul_col"),
+                sub_labels = c("Est.", "LL", "UL"), footnote = footnote))
+  }
+
+  se_label <- if (effective_bayes) "PSD" else "SE"
+  se_note  <- if (effective_bayes) " PSD = posterior standard deviation." else ""
+  list(data = select(df, -".sig"),
+       value_cols = c("est_col", "se_col", "ll_col", "ul_col"),
+       sub_labels = c("Est.", se_label, "LL", "UL"),
+       footnote = paste0(footnote, se_note))
+}
+
 #' Build the standalone "Random effects" table (internal)
 #'
 #' Random slopes are associated with a specific within-person fixed effect, only
@@ -547,7 +612,7 @@ coef_wrapper <- function(model, label_replace = NULL, params = c('regression'), 
 #' @param re A tibble of the random-slope rows from [coef_wrapper()] (those with
 #'   `random_slope == TRUE`), carrying `est`, `se`/`pval` or `LowerCI`/`UpperCI`,
 #'   the `IV` column, and the `within_avg_effect`/`random_effect`/`variance` flags.
-#' @param display `"est_ci"` or `"est_se"`.
+#' @param display `"est_ci"`, `"est_se"`, or `"est_se_ci"`.
 #' @param effective_bayes Logical; controls credibility-vs-confidence wording.
 #' @param sig_threshold P-value threshold for stars (est_se only).
 #' @param digits Decimal places.
@@ -556,8 +621,6 @@ coef_wrapper <- function(model, label_replace = NULL, params = c('regression'), 
 mplus_random_effects_table <- function(re, display, effective_bayes,
                                        sig_threshold, digits,
                                        return_data = FALSE) {
-  fmt <- function(x) format(round(x, digits), nsmall = digits)
-
   re <- re |>
     mutate(
       .slope = sub("(<->|<-).*$", "", Label),
@@ -580,38 +643,12 @@ mplus_random_effects_table <- function(re, display, effective_bayes,
     ) |>
     dplyr::arrange(.slope, .ord)
 
-  if (display == "est_ci") {
-    out <- re |>
-      mutate(
-        .sig    = !(LowerCI <= 0 & UpperCI >= 0),
-        est_col = paste0(fmt(est), if_else(.sig, "*", "")),
-        ll_col  = fmt(LowerCI),
-        ul_col  = fmt(UpperCI)
-      ) |>
-      select(Parameter, est_col, ll_col, ul_col)
-    value_cols <- c("est_col", "ll_col", "ul_col")
-    sub_labels <- c("Est.", "LL", "UL")
-    interval   <- if (effective_bayes) "credibility" else "confidence"
-    footnote   <- paste0(
-      "* 95% ", interval, " interval excludes zero. ",
-      "LL and UL are the lower and upper limits of the 95% ", interval, " interval."
-    )
-  } else {
-    out <- re |>
-      mutate(
-        .sig    = !is.na(pval) & pval < sig_threshold,
-        est_col = paste0(fmt(est), if_else(.sig, "*", "")),
-        se_col  = fmt(se)
-      ) |>
-      select(Parameter, est_col, se_col)
-    value_cols <- c("est_col", "se_col")
-    sub_labels <- c("Est.", "SE")
-    footnote   <- if (effective_bayes) {
-      paste0("* p < ", sig_threshold, ", one-tailed.")
-    } else {
-      paste0("* p < ", sig_threshold)
-    }
-  }
+  cols       <- mplus_display_columns(re, display, effective_bayes,
+                                      sig_threshold, digits)
+  value_cols <- cols$value_cols
+  sub_labels <- cols$sub_labels
+  footnote   <- cols$footnote
+  out        <- cols$data |> select(Parameter, all_of(value_cols))
 
   if (return_data || !requireNamespace("gt", quietly = TRUE)) return(out)
 
@@ -644,8 +681,6 @@ mplus_growth_table <- function(coefs, factor_names, display, effective_bayes,
                                sig_threshold, digits, na_replace,
                                predictor_order = NULL,
                                return_data = FALSE) {
-  fmt <- function(x) format(round(x, digits), nsmall = digits)
-
   coefs <- coefs |>
     mutate(DV = trimws(DV), IV = trimws(IV)) |>
     filter(DV %in% factor_names)
@@ -674,40 +709,12 @@ mplus_growth_table <- function(coefs, factor_names, display, effective_bayes,
       )
     )
 
-  if (display == "est_ci") {
-    long <- coefs |>
-      mutate(
-        sig     = !(LowerCI <= 0 & UpperCI >= 0),
-        est_col = paste0(fmt(est), if_else(sig, "*", "")),
-        ll_col  = fmt(LowerCI),
-        ul_col  = fmt(UpperCI)
-      ) |>
-      select(group, IV, DV, est_col, ll_col, ul_col)
-
-    value_cols <- c("est_col", "ll_col", "ul_col")
-    sub_labels <- c("Est.", "LL", "UL")
-    interval   <- if (effective_bayes) "credibility" else "confidence"
-    footnote   <- paste0(
-      "* 95% ", interval, " interval excludes zero. ",
-      "LL and UL are the lower and upper limits of the 95% ", interval, " interval."
-    )
-  } else {
-    long <- coefs |>
-      mutate(
-        sig     = !is.na(pval) & pval < sig_threshold,
-        est_col = paste0(fmt(est), if_else(sig, "*", "")),
-        se_col  = fmt(se)
-      ) |>
-      select(group, IV, DV, est_col, se_col)
-
-    value_cols <- c("est_col", "se_col")
-    sub_labels <- c("Est.", "SE")
-    footnote   <- if (effective_bayes) {
-      paste0("* p < ", sig_threshold, ", one-tailed.")
-    } else {
-      paste0("* p < ", sig_threshold)
-    }
-  }
+  cols       <- mplus_display_columns(coefs, display, effective_bayes,
+                                      sig_threshold, digits)
+  value_cols <- cols$value_cols
+  sub_labels <- cols$sub_labels
+  footnote   <- cols$footnote
+  long       <- cols$data |> select(group, IV, DV, all_of(value_cols))
 
   wide <- long |>
     pivot_wider(
@@ -784,6 +791,10 @@ mplus_growth_table <- function(coefs, factor_names, display, effective_bayes,
 #'   the lower and upper limits of that interval (defined in the footnote).
 #'   Significance comes from the interval, not p-values, so the one-tailed
 #'   p-value message is not emitted for Bayesian models in this mode.
+#' - `"est_se_ci"`: as `"est_ci"`, plus the SE between the estimate and the
+#'   interval. For Bayesian models the column is labelled `PSD` (posterior
+#'   standard deviation) and defined in the footnote. Stars come from the
+#'   interval, as in `"est_ci"`.
 #'
 #' `display_type` is auto-detected from the estimator when `NULL` (default):
 #' Bayesian models -> `"est_ci"`, all others -> `"est_se"`.
@@ -870,7 +881,8 @@ mplus_growth_table <- function(coefs, factor_names, display, effective_bayes,
 #' @param bayes `NULL` (default) to auto-detect; `TRUE`/`FALSE` to override.
 #'   Warnings from conflicting explicit values are issued by [coef_wrapper()].
 #' @param display_type `NULL` (default, auto-detect), `"est_se"` (estimate + SE,
-#'   p-value stars), or `"est_ci"` (estimate + CI LL/UL, interval-exclusion stars).
+#'   p-value stars), `"est_ci"` (estimate + CI LL/UL, interval-exclusion stars),
+#'   or `"est_se_ci"` (estimate + SE/PSD + CI LL/UL, interval-exclusion stars).
 #' @param type coefficient scale passed through to [coef_wrapper()]. Default `"un"`.
 #' @param sig_threshold P-value threshold for significance stars (`"est_se"` only, default 0.05).
 #' @param digits Number of decimal places (default 3).
@@ -918,6 +930,7 @@ mplus_growth_table <- function(coefs, factor_names, display, effective_bayes,
 #' m <- MplusAutomation::readModels("inst/extdata/ex5.11.out")
 #' coef_table_mplus(m)
 #' coef_table_mplus(m, display_type = "est_ci")
+#' coef_table_mplus(m, display_type = "est_se_ci")  # estimate, SE/PSD, LL, UL
 #' coef_table_mplus(m, na_replace = NULL, return_data = TRUE)
 #' coef_table_mplus(m, label_replace = c("F3" = "Mediator", "F4" = "Outcome"))
 #' # put F2 above F1 in the predictor column
@@ -970,10 +983,10 @@ coef_table_mplus <- function(model, label_replace = NULL, params = NULL,
   effective_display <- if (is.null(display_type)) {
     if (effective_bayes) "est_ci" else "est_se"
   } else {
-    display_type
+    match.arg(display_type, c("est_se", "est_ci", "est_se_ci"))
   }
 
-  fetch_ci <- effective_display == "est_ci"
+  fetch_ci <- effective_display %in% c("est_ci", "est_se_ci")
 
   # The one-tailed p-value note is only relevant when p-values are actually
   # displayed (est_se). With est_ci significance comes from the credibility
@@ -1070,8 +1083,6 @@ coef_table_mplus <- function(model, label_replace = NULL, params = NULL,
       ))
     }
   }
-
-  fmt <- function(x) format(round(x, digits), nsmall = digits)
 
   # Random slopes are tied to a within-person fixed effect, not primarily to an
   # outcome, so they get their own table rather than being squeezed into the
@@ -1180,67 +1191,24 @@ coef_table_mplus <- function(model, label_replace = NULL, params = NULL,
   has_generic <- show_constraints && length(dvs) == 0 &&
     any(constraint_rows$.dv == generic_dv)
 
-  if (effective_display == "est_ci") {
-    long <- coefs |>
-      mutate(
-        sig     = !(LowerCI <= 0 & UpperCI >= 0),
-        est_col = paste0(fmt(est), if_else(sig, "*", "")),
-        ll_col  = fmt(LowerCI),
-        ul_col  = fmt(UpperCI)
-      ) |>
-      select(group, IV, DV, est_col, ll_col, ul_col)
+  cols       <- mplus_display_columns(coefs, effective_display, effective_bayes,
+                                      sig_threshold, digits)
+  value_cols <- cols$value_cols
+  sub_labels <- cols$sub_labels
+  footnote   <- cols$footnote
+  long       <- cols$data |> select(group, IV, DV, all_of(value_cols))
 
-    if (show_constraints) {
-      long <- dplyr::bind_rows(long, constraint_rows |>
-        mutate(
-          group   = .grp,
-          IV      = .disp_name,
-          DV      = .dv,
-          sig     = !(LowerCI <= 0 & UpperCI >= 0),
-          est_col = paste0(fmt(est), if_else(sig, "*", "")),
-          ll_col  = fmt(LowerCI),
-          ul_col  = fmt(UpperCI)
-        ) |>
-        select(group, IV, DV, est_col, ll_col, ul_col))
-    }
-
-    value_cols <- c("est_col", "ll_col", "ul_col")
-    sub_labels <- c("Est.", "LL", "UL")
-    interval   <- if (effective_bayes) "credibility" else "confidence"
-    footnote   <- paste0(
-      "* 95% ", interval, " interval excludes zero. ",
-      "LL and UL are the lower and upper limits of the 95% ", interval, " interval."
+  # MODEL CONSTRAINT rows are formatted (and starred) exactly like the
+  # regression rows.
+  if (show_constraints) {
+    constraint_cols <- mplus_display_columns(
+      constraint_rows |> mutate(group = .grp, IV = .disp_name, DV = .dv),
+      effective_display, effective_bayes, sig_threshold, digits
     )
-
-  } else {
-    long <- coefs |>
-      mutate(
-        sig     = !is.na(pval) & pval < sig_threshold,
-        est_col = paste0(fmt(est), if_else(sig, "*", "")),
-        se_col  = fmt(se)
-      ) |>
-      select(group, IV, DV, est_col, se_col)
-
-    if (show_constraints) {
-      long <- dplyr::bind_rows(long, constraint_rows |>
-        mutate(
-          group   = .grp,
-          IV      = .disp_name,
-          DV      = .dv,
-          sig     = !is.na(pval) & pval < sig_threshold,
-          est_col = paste0(fmt(est), if_else(sig, "*", "")),
-          se_col  = fmt(se)
-        ) |>
-        select(group, IV, DV, est_col, se_col))
-    }
-
-    value_cols <- c("est_col", "se_col")
-    sub_labels <- c("Est.", "SE")
-    footnote   <- if (effective_bayes) {
-      paste0("* p < ", sig_threshold, ", one-tailed.")
-    } else {
-      paste0("* p < ", sig_threshold)
-    }
+    long <- dplyr::bind_rows(
+      long,
+      constraint_cols$data |> select(group, IV, DV, all_of(value_cols))
+    )
   }
 
   # Pivot to wide with column names {value}__{DV}; rows keyed by (group, IV).

@@ -33,7 +33,8 @@ for two-level and growth tables, and \code{"regression"} otherwise.}
 Warnings from conflicting explicit values are issued by \code{\link[=coef_wrapper]{coef_wrapper()}}.}
 
 \item{display_type}{\code{NULL} (default, auto-detect), \code{"est_se"} (estimate + SE,
-p-value stars), or \code{"est_ci"} (estimate + CI LL/UL, interval-exclusion stars).}
+p-value stars), \code{"est_ci"} (estimate + CI LL/UL, interval-exclusion stars),
+or \code{"est_se_ci"} (estimate + SE/PSD + CI LL/UL, interval-exclusion stars).}
 
 \item{type}{coefficient scale passed through to \code{\link[=coef_wrapper]{coef_wrapper()}}. Default \code{"un"}.}
 
@@ -94,6 +95,10 @@ message to the same effect is emitted (since p-values are in play here).
 the lower and upper limits of that interval (defined in the footnote).
 Significance comes from the interval, not p-values, so the one-tailed
 p-value message is not emitted for Bayesian models in this mode.
+\item \code{"est_se_ci"}: as \code{"est_ci"}, plus the SE between the estimate and the
+interval. For Bayesian models the column is labelled \code{PSD} (posterior
+standard deviation) and defined in the footnote. Stars come from the
+interval, as in \code{"est_ci"}.
 }
 }
 \details{
@@ -185,6 +190,7 @@ See the \code{constraints} argument.
 m <- MplusAutomation::readModels("inst/extdata/ex5.11.out")
 coef_table_mplus(m)
 coef_table_mplus(m, display_type = "est_ci")
+coef_table_mplus(m, display_type = "est_se_ci")  # estimate, SE/PSD, LL, UL
 coef_table_mplus(m, na_replace = NULL, return_data = TRUE)
 coef_table_mplus(m, label_replace = c("F3" = "Mediator", "F4" = "Outcome"))
 # put F2 above F1 in the predictor column
